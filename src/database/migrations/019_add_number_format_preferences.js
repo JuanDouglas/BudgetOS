@@ -15,13 +15,13 @@ export async function up(knex) {
   // Groups table: default values for new members
   await knex.schema.alterTable('groups', (table) => {
     table.string('default_decimal_separator', 1).defaultTo(',');
-    table.string('default_digit_grouping', 1).defaultTo(' ');
+    table.string('default_digit_grouping', 1).defaultTo('.');
   });
 
   // System settings: application-wide defaults
   await knex('system_settings').insert([
     { id: uuidv4(), key: 'default_decimal_separator', value: ',' },
-    { id: uuidv4(), key: 'default_digit_grouping', value: ' ' },
+    { id: uuidv4(), key: 'default_digit_grouping', value: '.' },
   ]);
 }
 

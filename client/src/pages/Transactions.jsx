@@ -112,6 +112,7 @@ const TransactionTypeIcon = ({ type, amount }) => {
  */
 export function TransactionModal({ transaction, accounts, categories, payees, creditCards, defaultAccountId, onClose, onSave, onCreatePayee, onCreateCategory, toast }) {
   const { t, i18n } = useTranslation()
+  const { formatCurrency } = useFormatters()
   const [formData, setFormData] = useState(() => {
     if (transaction) {
       return { ...transaction, amount: transaction.amount != null ? String(Math.abs(transaction.amount)) : '' }
@@ -127,6 +128,7 @@ export function TransactionModal({ transaction, accounts, categories, payees, cr
       type: 'expense',
       checkNumber: '',
       creditCardId: '',
+      installmentCount: 1,
     }
   })
 
@@ -273,6 +275,7 @@ export function TransactionModal({ transaction, accounts, categories, payees, cr
                       setFormData({
                         ...formData,
                         creditCardId: cardId,
+                        installmentCount: 1,
                         checkNumber: '',
                         ...(card?.accountId ? { accountId: card.accountId } : {})
                       })
@@ -323,6 +326,35 @@ export function TransactionModal({ transaction, accounts, categories, payees, cr
                   >
                     <X className="w-4 h-4" />
                   </button>
+                </div>
+              )}
+              {!transaction && formData.type === 'expense' && selectedCard?.debitType === 'deferred' && formData.creditCardId && formData.creditCardId !== '__selecting__' && (
+                <div className="mt-3">
+                  <label htmlFor="installment-count" className="mb-1 block text-sm font-medium text-gray-700">
+                    {t('transactions.installments.label', { defaultValue: 'Parcelamento' })}
+                  </label>
+                  <select
+                    id="installment-count"
+                    value={formData.installmentCount || 1}
+                    onChange={(event) => setFormData({ ...formData, installmentCount: Number(event.target.value) })}
+                    className="input"
+                  >
+                    {[...Array(12)].map((_, index) => (
+                      <option key={index + 1} value={index + 1}>
+                        {index === 0
+                          ? t('transactions.installments.single', { defaultValue: 'À vista' })
+                          : t('transactions.installments.count', { count: index + 1, defaultValue: '{{count}} parcelas' })}
+                      </option>
+                    ))}
+                  </select>
+                  {Number(formData.installmentCount) > 1 && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      {t('transactions.installments.preview', {
+                        amount: formatCurrency(parseAmount(formData.amount) / Number(formData.installmentCount)),
+                        defaultValue: 'Cada parcela será lançada em um ciclo mensal separado.',
+                      })}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -533,6 +565,8 @@ export default function Transactions() {
   const invalidateTransactionQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['transactions'] })
     queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+    queryClient.invalidateQueries({ queryKey: ['credit-card-cycle'] })
   }
 
   // Handle account tab change
@@ -828,6 +862,7 @@ export default function Transactions() {
       const checkNumber = formData.checkNumber && formData.checkNumber !== '__selecting__'
         ? formData.checkNumber.trim() : null
       cleanData.creditCardId = creditCardId ? creditCardId : null
+      cleanData.installmentCount = creditCardId ? Number(formData.installmentCount) || 1 : 1
       cleanData.checkNumber = creditCardId ? null : (checkNumber || null)
     }
 
@@ -1153,6 +1188,15 @@ export default function Transactions() {
                         <td className="px-4 py-3 text-sm text-gray-600">{formatDate(tx.date)}</td>
                         <td className="px-4 py-3">
                           <p className="font-medium text-gray-900">{tx.description}</p>
+                          {tx.installmentCount > 1 && (
+                            <p className="text-xs text-gray-500">
+                              {t('transactions.installments.position', {
+                                current: tx.installmentNumber,
+                                total: tx.installmentCount,
+                                defaultValue: 'Parcela {{current}} de {{total}}',
+                              })}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
                           {tx.payeeName ? (

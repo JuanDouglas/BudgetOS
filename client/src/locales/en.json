@@ -586,6 +586,32 @@
       "detail": "Category Detail"
     },
     "forecast": {
+          "bpo": {
+            "dre": "Management P&L",
+            "payables": "Payables",
+            "receivables": "Receivables",
+            "reconciliation": "Reconciliation",
+            "cashflow": "Cash flow",
+            "accounting": "Accounting",
+            "accountingTitle": "Management trial balance",
+            "nature": "Nature",
+            "credit": "Credits",
+            "debit": "Debits",
+            "balance": "Period balance",
+            "dreTitle": "Management income statement",
+            "netResult": "Net result",
+            "income": "Income",
+            "expenses": "Expenses",
+            "accountingGroup": "Category",
+            "entries": "Entries",
+            "amount": "Amount",
+            "noEntries": "No entries in this period",
+            "dueWindow": "Due in the next 90 days",
+            "reconciliationTitle": "Unreconciled transactions",
+            "allReconciled": "All transactions are reconciled",
+            "dueDate": "Date",
+            "description": "Description"
+          },
       "currentBalance": "Current Balance",
       "in30days": "In 30 days",
       "in60days": "In 60 days",
@@ -644,6 +670,7 @@
         "zh": "中文"
       },
       "currencies": {
+          "BRL": "Brazilian Real (R$)",
         "EUR": "Euro (€)",
         "USD": "Dollar ($)",
         "GBP": "British Pound (£)",

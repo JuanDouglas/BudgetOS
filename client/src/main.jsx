@@ -4,9 +4,12 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './i18n'
 import App from './App'
+import { BRAND } from './lib/brand'
 import { AuthProvider } from './contexts/AuthContext'
 import { ToastProvider } from './components/Toast'
 import './index.css'
+
+document.title = `${BRAND.name} - Gestão Financeira`
 
 const queryClient = new QueryClient({
   defaultOptions: {

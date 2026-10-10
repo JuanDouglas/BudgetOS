@@ -30,8 +30,8 @@ export const registerSchema = z.object({
     .max(100, 'Last name too long')
     .trim()
     .optional(),
-  locale: z.enum(['fr', 'en', 'de', 'es', 'it', 'pt', 'ru', 'sv', 'zh']).default('fr'),
-  currency: z.enum(['EUR', 'USD', 'GBP', 'CHF', 'CAD']).default('EUR'),
+  locale: z.enum(['fr', 'en', 'de', 'es', 'it', 'pt', 'ru', 'sv', 'zh']).default('pt'),
+  currency: z.enum(['BRL', 'EUR', 'USD', 'GBP', 'CHF', 'CAD']).default('BRL'),
   decimalSeparator: z.enum(['.', ',']).optional(),
   digitGrouping: z.enum([',', '.', ' ', '']).optional(),
 }).refine((data) => data.password === data.passwordConfirm, {
@@ -74,7 +74,7 @@ export const updateProfileSchema = z.object({
     .trim()
     .optional(),
   locale: z.enum(['fr', 'en', 'de', 'es', 'it', 'pt', 'ru', 'sv', 'zh']).optional(),
-  currency: z.enum(['EUR', 'USD', 'GBP', 'CHF', 'CAD']).optional(),
+  currency: z.enum(['BRL', 'EUR', 'USD', 'GBP', 'CHF', 'CAD']).optional(),
   timezone: z.string().max(50).optional(),
   decimalSeparator: z.enum(['.', ',']).optional(),
   digitGrouping: z.enum([',', '.', ' ', '']).optional(),

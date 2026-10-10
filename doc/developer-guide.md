@@ -9,9 +9,10 @@ Technical reference for developers contributing to or extending BudgetOS.
 1. [Tech Stack](#tech-stack)
 2. [Project Structure](#project-structure)
 3. [Development Setup](#development-setup)
-4. [Testing](#testing)
-5. [Server Management](#server-management)
-6. [API Endpoints](#api-endpoints)
+4. [Branding](#branding)
+5. [Testing](#testing)
+6. [Server Management](#server-management)
+7. [API Endpoints](#api-endpoints)
 
 ---
 
@@ -39,6 +40,13 @@ Technical reference for developers contributing to or extending BudgetOS.
 | Styling | TailwindCSS |
 | Charts | Recharts |
 | Icons | lucide-react |
+
+## Branding
+
+The product name and short mark can be overridden with `VITE_APP_NAME` and
+`VITE_APP_MARK` in `client/.env.local`. The default identity is Carvalho with
+navy `#12284d`, gold `#cca761`, and white. The palette is defined in
+`client/src/lib/brand.js`; edit its `palette` values to rebrand the interface.
 
 ---
 

@@ -360,6 +360,13 @@
     "newTransaction": "Nova transação",
     "editTransaction": "Editar transação",
     "paymentMethod": "Método de pagamento (opcional)",
+    "installments": {
+      "label": "Parcelamento",
+      "single": "À vista",
+      "count": "{{count}} parcelas",
+      "preview": "Valor aproximado por parcela: {{amount}}",
+      "position": "Parcela {{current}} de {{total}}"
+    },
     "card": "Cartão",
     "check": "Cheque",
     "selectCard": "Selecionar um cartão",
@@ -586,6 +593,32 @@
       "detail": "Detalhe por Categoria"
     },
     "forecast": {
+          "bpo": {
+            "dre": "DRE gerencial",
+            "payables": "Contas a pagar",
+            "receivables": "Contas a receber",
+            "reconciliation": "Conciliação",
+            "cashflow": "Fluxo de caixa",
+            "dreTitle": "DRE gerencial",
+            "netResult": "Resultado líquido",
+            "income": "Receitas",
+            "expenses": "Despesas",
+            "accountingGroup": "Categoria",
+            "entries": "Lançamentos",
+            "amount": "Valor",
+            "noEntries": "Sem lançamentos no período",
+            "dueWindow": "Vencimentos previstos para os próximos 90 dias",
+            "reconciliationTitle": "Lançamentos não conciliados",
+            "allReconciled": "Todos os lançamentos estão conciliados",
+            "dueDate": "Data",
+            "description": "Descrição",
+            "accounting": "Contábil",
+            "accountingTitle": "Balancete gerencial",
+            "nature": "Natureza",
+            "credit": "Crédito",
+            "debit": "Débito",
+            "balance": "Saldo do período"
+          },
       "currentBalance": "Saldo Atual",
       "in30days": "Em 30 dias",
       "in60days": "Em 60 dias",
@@ -644,6 +677,7 @@
         "zh": "中文"
       },
       "currencies": {
+          "BRL": "Real brasileiro (R$)",
         "EUR": "Euro (€)",
         "USD": "Dólar ($)",
         "GBP": "Libra Esterlina (£)",

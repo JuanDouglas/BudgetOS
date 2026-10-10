@@ -63,9 +63,9 @@ export class SystemSetting {
     return {
       allowPublicRegistration: settings.allow_public_registration === 'true',
       defaultRegistrationGroupId: settings.default_registration_group_id || null,
-      defaultLocale: settings.default_locale || 'fr',
+      defaultLocale: settings.default_locale || 'pt',
       defaultDecimalSeparator: settings.default_decimal_separator || ',',
-      defaultDigitGrouping: settings.default_digit_grouping || ' ',
+      defaultDigitGrouping: settings.default_digit_grouping || '.',
     };
   }
 }

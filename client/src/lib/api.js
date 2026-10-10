@@ -19,6 +19,11 @@ const api = axios.create({
 
 /** @type {string|null} Cached CSRF token */
 let csrfToken = null
+let activeWorkspaceId = null
+
+export const setWorkspaceRequestContext = (workspaceId) => {
+  activeWorkspaceId = workspaceId || null
+}
 
 /**
  * Fetches CSRF token from the server
@@ -45,6 +50,11 @@ export const preloadCsrfToken = () => fetchCsrfToken(true)
 
 // Request interceptor: adds CSRF token to state-changing requests
 api.interceptors.request.use(async (config) => {
+  if (activeWorkspaceId) {
+    config.headers['X-Workspace-ID'] = activeWorkspaceId
+  } else {
+    delete config.headers['X-Workspace-ID']
+  }
   if (['post', 'put', 'patch', 'delete'].includes(config.method)) {
     const token = await fetchCsrfToken()
     if (token) {
@@ -105,6 +115,12 @@ export const authApi = {
   validateResetToken: (token) => api.get('/auth/validate-reset-token', { params: { token } }),
   /** @param {string} token - Reset token */
   resetPassword: (token, password, passwordConfirm) => api.post('/auth/reset-password', { token, password, passwordConfirm }),
+}
+
+export const workspaceApi = {
+  getAll: () => api.get('/workspaces'),
+  create: (data) => api.post('/workspaces', data),
+  activate: (workspaceId) => api.post(`/workspaces/${workspaceId}/activate`),
 }
 
 /**
@@ -206,6 +222,7 @@ export const reportsApi = {
   getDashboard: () => api.get('/reports/dashboard'),
   /** @param {Object} params - Date range params (startDate, endDate) */
   getExpensesByCategory: (params) => api.get('/reports/expenses/category', { params }),
+  getIncomeByCategory: (params) => api.get('/reports/income/category', { params }),
   /** @param {Object} params - Date range params */
   getMonthlyTrend: (params) => api.get('/reports/trend/monthly', { params }),
   /** @param {Object} params - Forecast params (days: 30/60/90) */

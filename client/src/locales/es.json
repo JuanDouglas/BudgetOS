@@ -586,6 +586,32 @@
       "detail": "Detalle por categoría"
     },
     "forecast": {
+          "bpo": {
+            "dre": "Estado de resultados",
+            "payables": "Cuentas por pagar",
+            "receivables": "Cuentas por cobrar",
+            "reconciliation": "Conciliación",
+            "cashflow": "Flujo de caja",
+            "accounting": "Contabilidad",
+            "accountingTitle": "Balance de comprobación gerencial",
+            "nature": "Naturaleza",
+            "credit": "Créditos",
+            "debit": "Débitos",
+            "balance": "Saldo del período",
+            "dreTitle": "Estado de resultados gerencial",
+            "netResult": "Resultado neto",
+            "income": "Ingresos",
+            "expenses": "Gastos",
+            "accountingGroup": "Categoría",
+            "entries": "Movimientos",
+            "amount": "Importe",
+            "noEntries": "No hay movimientos en este período",
+            "dueWindow": "Vencimientos previstos para los próximos 90 días",
+            "reconciliationTitle": "Movimientos sin conciliar",
+            "allReconciled": "Todos los movimientos están conciliados",
+            "dueDate": "Fecha",
+            "description": "Descripción"
+          },
       "currentBalance": "Saldo actual",
       "in30days": "En 30 días",
       "in60days": "En 60 días",
@@ -644,6 +670,7 @@
         "zh": "中文"
       },
       "currencies": {
+          "BRL": "Real brasileño (R$)",
         "EUR": "Euro (€)",
         "USD": "Dólar ($)",
         "GBP": "Libra esterlina (£)",

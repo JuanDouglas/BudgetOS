@@ -32,7 +32,7 @@ const createApp = () => {
     origin: config.isDev ? true : process.env.CORS_ORIGIN?.split(',') || false, // lgtm[js/cors-misconfiguration]
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Workspace-ID'],
     exposedHeaders: ['X-CSRF-Token'],
   }));
 

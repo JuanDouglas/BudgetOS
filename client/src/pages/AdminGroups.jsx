@@ -31,7 +31,7 @@ function GroupModal({ group, onClose, onSave, appDefaults }) {
   const [formData, setFormData] = useState({
     name: group?.name || '',
     description: group?.description || '',
-    defaultLocale: group?.defaultLocale || appDefaults?.defaultLocale || 'fr',
+    defaultLocale: group?.defaultLocale || appDefaults?.defaultLocale || 'pt',
     defaultDecimalSeparator: group?.defaultDecimalSeparator || appDefaults?.defaultDecimalSeparator || ',',
     defaultDigitGrouping: group?.defaultDigitGrouping || appDefaults?.defaultDigitGrouping || ' ',
   })
@@ -149,8 +149,8 @@ function AddMemberModal({ onClose, onSave, users, existingMemberIds, isSuperAdmi
     firstName: '',
     lastName: '',
     role: 'member',
-    locale: 'fr',
-    currency: 'EUR',
+    locale: 'pt',
+    currency: 'BRL',
   })
 
   const availableUsers = users.filter((u) => !existingMemberIds.includes(u.id))
@@ -307,6 +307,7 @@ function AddMemberModal({ onClose, onSave, users, existingMemberIds, isSuperAdmi
                   onChange={(e) => setNewMemberData({ ...newMemberData, currency: e.target.value })}
                   className="input"
                 >
+                  <option value="BRL">BRL</option>
                   <option value="EUR">EUR</option>
                   <option value="USD">USD</option>
                   <option value="GBP">GBP</option>
@@ -593,7 +594,7 @@ export default function AdminGroups() {
   })
 
   const appDefaults = {
-    defaultLocale: settingsData?.data?.defaultLocale || 'fr',
+    defaultLocale: settingsData?.data?.defaultLocale || 'pt',
     defaultDecimalSeparator: settingsData?.data?.defaultDecimalSeparator || ',',
     defaultDigitGrouping: settingsData?.data?.defaultDigitGrouping || ' ',
   }

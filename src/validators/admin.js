@@ -31,8 +31,8 @@ export const createUserSchema = z.object({
     .optional(),
   role: z.enum(['user', 'admin']).default('user'),
   groupId: z.string().min(1, 'Group ID required').optional(),
-  locale: z.enum(['fr', 'en', 'de', 'es', 'it', 'pt', 'ru', 'sv', 'zh']).default('fr'),
-  currency: z.enum(['EUR', 'USD', 'GBP', 'CHF', 'CAD']).default('EUR'),
+  locale: z.enum(['fr', 'en', 'de', 'es', 'it', 'pt', 'ru', 'sv', 'zh']).default('pt'),
+  currency: z.enum(['BRL', 'EUR', 'USD', 'GBP', 'CHF', 'CAD']).default('BRL'),
   decimalSeparator: z.enum(['.', ',']).optional(),
   digitGrouping: z.enum([',', '.', ' ', '']).optional(),
 }).refine((data) => !data.digitGrouping || data.digitGrouping !== data.decimalSeparator, {
@@ -65,7 +65,7 @@ export const updateUserSchema = z.object({
     .optional(),
   role: z.enum(['user', 'admin', 'super_admin']).optional(),
   locale: z.enum(['fr', 'en', 'de', 'es', 'it', 'pt', 'ru', 'sv', 'zh']).optional(),
-  currency: z.enum(['EUR', 'USD', 'GBP', 'CHF', 'CAD']).optional(),
+  currency: z.enum(['BRL', 'EUR', 'USD', 'GBP', 'CHF', 'CAD']).optional(),
   decimalSeparator: z.enum(['.', ',']).optional(),
   digitGrouping: z.enum([',', '.', ' ', '']).optional(),
 }).refine((data) => !data.digitGrouping || data.digitGrouping !== data.decimalSeparator, {

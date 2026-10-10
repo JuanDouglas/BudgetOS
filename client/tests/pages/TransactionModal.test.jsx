@@ -155,6 +155,24 @@ describe('TransactionModal - Card/Check ↔ Account Consistency', () => {
       expect(accountSelect.value).toBe('acc-checking')
     })
 
+    it('offers installments for deferred cards and submits the selected count', () => {
+      const onSave = vi.fn()
+      const { container } = render(
+        <TransactionModal
+          {...defaultProps}
+          onSave={onSave}
+          creditCards={[{ id: 'cc-deferred', name: 'Visa Parcelado', accountId: 'acc-checking', debitType: 'deferred' }]}
+        />
+      )
+
+      fireEvent.click(screen.getByText('transactions.card'))
+      fireEvent.change(container.querySelector('select'), { target: { value: 'cc-deferred' } })
+      fireEvent.change(container.querySelector('#installment-count'), { target: { value: '3' } })
+      fireEvent.submit(container.querySelector('form'))
+
+      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ installmentCount: 3 }))
+    })
+
     it('auto-selects a different account when switching cards', () => {
       const { container } = render(<TransactionModal {...defaultProps} />)
 

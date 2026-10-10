@@ -10,7 +10,10 @@ export const register = async (req, res) => {
   const { default: Group } = await import('../models/Group.js');
 
   // Check if this is the first user (bootstrap mode)
-  const userCount = await knex('users').count('* as count').first();
+  const userCount = await knex('users')
+    .where('is_workspace_identity', false)
+    .count('* as count')
+    .first();
   const isFirstUser = Number(userCount?.count || 0) === 0;
 
   if (!isFirstUser) {

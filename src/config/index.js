@@ -141,10 +141,10 @@ const config = {
   },
   
   app: {
-    defaultLocale: process.env.DEFAULT_LOCALE || 'fr',
-    defaultCurrency: process.env.DEFAULT_CURRENCY || 'EUR',
-    supportedCurrencies: ['EUR', 'USD', 'GBP', 'CHF', 'CAD'],
-    supportedLocales: ['fr', 'en'],
+    defaultLocale: process.env.DEFAULT_LOCALE || 'pt',
+    defaultCurrency: process.env.DEFAULT_CURRENCY || 'BRL',
+    supportedCurrencies: ['BRL', 'EUR', 'USD', 'GBP', 'CHF', 'CAD'],
+    supportedLocales: ['pt', 'fr', 'en', 'de', 'es', 'it', 'ru', 'sv', 'zh'],
   },
   
   smtp: {

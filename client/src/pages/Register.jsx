@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { BRAND } from '../lib/brand'
 import { useAuth } from '../contexts/AuthContext'
 import { UserPlus, Mail, Lock, User } from 'lucide-react'
 import PasswordInput from '../components/PasswordInput'
@@ -16,6 +17,8 @@ export default function Register() {
     passwordConfirm: '',
     firstName: '',
     lastName: '',
+    locale: 'pt',
+    currency: 'BRL',
   })
   const [loading, setLoading] = useState(false)
   const { register, needsSetup } = useAuth()
@@ -59,10 +62,10 @@ export default function Register() {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-100 mb-4">
-              <span className="text-2xl font-bold text-primary-600">B</span>
+              <span className="text-2xl font-bold text-primary-600">{BRAND.mark}</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {needsSetup ? t('auth.register.welcomeTitle') : t('auth.register.createTitle')}
+              {needsSetup ? t('auth.register.welcomeTitle').replace('BudgetOS', BRAND.name) : t('auth.register.createTitle')}
             </h1>
             <p className="text-gray-600 mt-2">
               {needsSetup ? t('auth.register.welcomeSubtitle') : t('auth.register.createSubtitle')}

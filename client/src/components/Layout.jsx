@@ -1,13 +1,15 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard, Wallet, ArrowLeftRight, CreditCard,
   Tags, BarChart3, LogOut, Menu, X, Upload, Repeat,
-  Wand2, Settings, Users, Shield, FolderTree, Cog, CalendarRange
+  Wand2, Settings, Users, Shield, FolderTree, Cog, CalendarRange, Building2, Plus
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '../lib/utils'
+import { BRAND } from '../lib/brand'
 
 const navigation = [
   { name: 'nav.dashboard', href: '/', icon: LayoutDashboard },
@@ -31,14 +33,49 @@ const adminNavigation = [
 ]
 
 export default function Layout() {
-  const { user, isGroupAdmin, logout } = useAuth()
+  const { user, isGroupAdmin, logout, workspaces, activeWorkspace, switchWorkspace, createWorkspace } = useAuth()
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showNewClient, setShowNewClient] = useState(false)
+  const [newClient, setNewClient] = useState({ name: '', locale: 'pt', currency: 'BRL' })
+  const [workspaceError, setWorkspaceError] = useState('')
+  const [switchingWorkspace, setSwitchingWorkspace] = useState(false)
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false)
 
   const handleLogout = async () => {
     await logout()
     navigate('/login')
+  }
+
+  const handleWorkspaceChange = async (event) => {
+    setWorkspaceError('')
+    setSwitchingWorkspace(true)
+    try {
+      await switchWorkspace(event.target.value)
+      queryClient.clear()
+    } catch (error) {
+      setWorkspaceError(error.response?.data?.error?.message || t('common.error'))
+    } finally {
+      setSwitchingWorkspace(false)
+    }
+  }
+
+  const handleCreateWorkspace = async (event) => {
+    event.preventDefault()
+    setWorkspaceError('')
+    setCreatingWorkspace(true)
+    try {
+      await createWorkspace(newClient)
+      queryClient.clear()
+      setShowNewClient(false)
+      setNewClient({ name: '', locale: 'pt', currency: 'BRL' })
+    } catch (error) {
+      setWorkspaceError(error.response?.data?.error?.message || t('common.error'))
+    } finally {
+      setCreatingWorkspace(false)
+    }
   }
 
   return (
@@ -59,7 +96,7 @@ export default function Layout() {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-            <h1 className="text-xl font-bold text-primary-600">BudgetOS</h1>
+            <h1 className="text-xl font-bold text-primary-600">{BRAND.name}</h1>
             <button 
               className="lg:hidden p-1 rounded hover:bg-gray-100"
               onClick={() => setSidebarOpen(false)}
@@ -124,7 +161,7 @@ export default function Layout() {
 
           {/* Version */}
           <div className="mx-4 mb-2 px-3 py-1.5 bg-gray-50 rounded-lg text-center">
-            <span className="text-xs text-gray-400 font-medium tracking-wide">BudgetOS v{__APP_VERSION__}</span>
+            <span className="text-xs text-gray-400 font-medium tracking-wide">{BRAND.name} v{__APP_VERSION__}</span>
           </div>
 
           {/* User */}
@@ -159,14 +196,92 @@ export default function Layout() {
             >
               <Menu className="w-5 h-5" />
             </button>
+            <div className="ml-auto flex min-w-0 items-center gap-2">
+              <Building2 className="hidden h-4 w-4 shrink-0 text-gray-500 sm:block" />
+              <label htmlFor="active-workspace" className="sr-only">{t('workspaces.current', { defaultValue: 'Cliente atual' })}</label>
+              <select
+                id="active-workspace"
+                value={activeWorkspace?.id || ''}
+                onChange={handleWorkspaceChange}
+                disabled={switchingWorkspace}
+                className="input h-10 max-w-[min(52vw,240px)] py-1 text-sm"
+                aria-label={t('workspaces.current', { defaultValue: 'Cliente atual' })}
+              >
+                {workspaces.map((workspace) => (
+                  <option key={workspace.id} value={workspace.id}>
+                    {workspace.isPersonal ? t('workspaces.personal', { defaultValue: 'Meu espaço' }) : workspace.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowNewClient(true)}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50"
+                title={t('workspaces.add', { defaultValue: 'Adicionar cliente' })}
+                aria-label={t('workspaces.add', { defaultValue: 'Adicionar cliente' })}
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </header>
 
         {/* Page content */}
         <main className="p-4 lg:p-6">
+          {workspaceError && !showNewClient && <p role="alert" className="mb-4 text-sm text-red-600">{workspaceError}</p>}
           <Outlet />
         </main>
       </div>
+
+      {showNewClient && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setShowNewClient(false)
+        }}>
+          <section className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="new-client-title">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 id="new-client-title" className="text-lg font-semibold">{t('workspaces.newTitle', { defaultValue: 'Novo cliente' })}</h2>
+              <button type="button" onClick={() => setShowNewClient(false)} className="rounded p-1 text-gray-500 hover:bg-gray-100" aria-label={t('common.close', { defaultValue: 'Fechar' })}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateWorkspace} className="space-y-4">
+              <div>
+                <label htmlFor="client-name" className="mb-1 block text-sm font-medium text-gray-700">{t('workspaces.name', { defaultValue: 'Nome do cliente' })}</label>
+                <input id="client-name" autoFocus required maxLength={120} value={newClient.name} onChange={(event) => setNewClient({ ...newClient, name: event.target.value })} className="input" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="client-locale" className="mb-1 block text-sm font-medium text-gray-700">{t('settings.preferences.language', { defaultValue: 'Idioma' })}</label>
+                  <select id="client-locale" value={newClient.locale} onChange={(event) => setNewClient({ ...newClient, locale: event.target.value, currency: event.target.value === 'pt' ? 'BRL' : newClient.currency })} className="input">
+                    <option value="pt">Português (Brasil)</option>
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                    <option value="fr">Français</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="client-currency" className="mb-1 block text-sm font-medium text-gray-700">{t('settings.preferences.currency', { defaultValue: 'Moeda' })}</label>
+                  <select id="client-currency" value={newClient.currency} onChange={(event) => setNewClient({ ...newClient, currency: event.target.value })} className="input">
+                    <option value="BRL">BRL - Real brasileiro</option>
+                    <option value="EUR">EUR - Euro</option>
+                    <option value="USD">USD - Dólar americano</option>
+                    <option value="GBP">GBP - Libra esterlina</option>
+                    <option value="CAD">CAD - Dólar canadense</option>
+                    <option value="CHF">CHF - Franco suíço</option>
+                  </select>
+                </div>
+              </div>
+              {workspaceError && <p role="alert" className="text-sm text-red-600">{workspaceError}</p>}
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowNewClient(false)} className="btn btn-secondary">{t('common.cancel', { defaultValue: 'Cancelar' })}</button>
+                <button type="submit" disabled={creatingWorkspace} className="btn btn-primary disabled:opacity-60">
+                  {creatingWorkspace ? t('common.saving', { defaultValue: 'Salvando...' }) : t('workspaces.create', { defaultValue: 'Criar cliente' })}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

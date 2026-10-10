@@ -586,6 +586,32 @@
       "detail": "分类明细"
     },
     "forecast": {
+          "bpo": {
+            "dre": "管理损益表",
+            "payables": "应付账款",
+            "receivables": "应收账款",
+            "reconciliation": "对账",
+            "cashflow": "现金流",
+            "accounting": "会计",
+            "accountingTitle": "管理试算平衡表",
+            "nature": "性质",
+            "credit": "贷方",
+            "debit": "借方",
+            "balance": "期间余额",
+            "dreTitle": "管理损益表",
+            "netResult": "净结果",
+            "income": "收入",
+            "expenses": "支出",
+            "accountingGroup": "类别",
+            "entries": "交易记录",
+            "amount": "金额",
+            "noEntries": "此期间没有交易记录",
+            "dueWindow": "未来 90 天内的到期项目",
+            "reconciliationTitle": "未对账交易",
+            "allReconciled": "所有交易均已对账",
+            "dueDate": "日期",
+            "description": "描述"
+          },
       "currentBalance": "当前余额",
       "in30days": "30天后",
       "in60days": "60天后",
@@ -644,6 +670,7 @@
         "zh": "中文"
       },
       "currencies": {
+          "BRL": "巴西雷亚尔 (R$)",
         "EUR": "欧元 (€)",
         "USD": "美元 ($)",
         "GBP": "英镑 (£)",

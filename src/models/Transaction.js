@@ -1,9 +1,16 @@
 import knex from '../database/connection.js';
 import dateHelpers from '../database/dateHelpers.js';
-import { generateId } from '../utils/helpers.js';
-import { NotFoundError } from '../utils/errors.js';
+import { generateId, formatDateISO } from '../utils/helpers.js';
+import { BadRequestError, NotFoundError } from '../utils/errors.js';
 import Account from './Account.js';
 import { buildUpdates, paginationMeta } from '../utils/modelHelpers.js';
+
+function installmentDate(dateValue, offset) {
+  const [year, month, day] = dateValue.split('-').map(Number);
+  const targetMonth = month - 1 + offset;
+  const lastDay = new Date(year, targetMonth + 1, 0).getDate();
+  return formatDateISO(new Date(year, targetMonth, Math.min(day, lastDay)));
+}
 
 /**
  * Insert a linked (destination) transaction for a transfer and update the main transaction link.
@@ -69,6 +76,14 @@ export class Transaction {
   static async create(userId, data) {
     const id = generateId();
     await Transaction.validateReferences(userId, data);
+    const installmentCount = data.installmentCount || 1;
+    const card = data.creditCardId
+      ? await knex('credit_cards').where({ id: data.creditCardId, user_id: userId }).first()
+      : null;
+
+    if (installmentCount > 1 && (!card || data.type !== 'expense' || card.debit_type !== 'deferred')) {
+      throw new BadRequestError('Installments require an expense on a deferred credit card', 'INSTALLMENTS_REQUIRE_CREDIT_CARD');
+    }
 
     // Handle external source transfer (no source account, only destination)
     if (data.type === 'transfer' && !data.accountId && data.toAccountId) {
@@ -105,36 +120,55 @@ export class Transaction {
       amount = -amount; // Debit for expenses and transfers (source account)
     }
 
+    const installmentGroupId = installmentCount > 1 ? generateId() : null;
+    const totalCents = Math.round(Math.abs(data.amount) * 100);
+    const baseCents = Math.floor(totalCents / installmentCount);
+    const remainderCents = totalCents % installmentCount;
+    const installmentIds = [];
+    const installmentRows = [];
+
     await knex.transaction(async (trx) => {
-      await trx('transactions').insert({
-        id,
-        user_id: userId,
-        account_id: data.accountId,
-        category_id: data.categoryId || null,
-        payee_id: data.payeeId || null,
-        credit_card_id: data.creditCardId || null,
-        amount,
-        description: data.description,
-        notes: data.notes || null,
-        date: data.date,
-        value_date: data.valueDate || null,
-        purchase_date: data.purchaseDate || null,
-        status: data.status || 'pending',
-        type: data.type,
-        is_split: !!data.isSplit,
-        is_recurring: !!data.isRecurring,
-        recurring_id: data.recurringId || null,
-        tags: data.tags ? JSON.stringify(data.tags) : null,
-        check_number: data.checkNumber || null,
-        import_hash: data.importHash || null,
-      });
+      for (let index = 0; index < installmentCount; index += 1) {
+        const transactionId = index === 0 ? id : generateId();
+        const installmentAmount = installmentCount === 1
+          ? amount
+          : -((baseCents + (index < remainderCents ? 1 : 0)) / 100);
+        installmentIds.push(transactionId);
+        installmentRows.push({
+          id: transactionId,
+          user_id: userId,
+          account_id: data.accountId,
+          category_id: data.categoryId || null,
+          payee_id: data.payeeId || null,
+          credit_card_id: data.creditCardId || null,
+          amount: installmentAmount,
+          description: data.description,
+          notes: data.notes || null,
+          date: installmentCount === 1 ? data.date : installmentDate(data.date, index),
+          purchase_date: data.purchaseDate || (installmentCount > 1 ? data.date : null),
+          value_date: data.valueDate || null,
+          status: data.status || 'pending',
+          type: data.type,
+          is_split: !!data.isSplit,
+          is_recurring: !!data.isRecurring,
+          recurring_id: data.recurringId || null,
+          tags: data.tags ? JSON.stringify(data.tags) : null,
+          check_number: data.checkNumber || null,
+          import_hash: data.importHash || null,
+          installment_group_id: installmentGroupId,
+          installment_number: installmentCount > 1 ? index + 1 : null,
+          installment_count: installmentCount > 1 ? installmentCount : null,
+        });
+      }
+
+      await trx('transactions').insert(installmentRows);
 
       // Update source account balance
       await Account.updateBalance(data.accountId, userId, trx);
 
       // Handle transfers with destination account
       if (data.type === 'transfer' && data.toAccountId) {
-        await Account.findByIdOrFail(data.toAccountId, userId);
+        await Account.findByIdOrFail(data.toAccountId, userId, trx);
         const transferId = generateId();
 
         await trx('transactions').insert({
@@ -158,7 +192,13 @@ export class Transaction {
       }
     });
 
-    return Transaction.findById(id, userId);
+    if (card?.debit_type === 'deferred') {
+      const { default: CreditCard } = await import('./CreditCard.js');
+      await CreditCard.assignTransactionsToCycles(installmentIds, data.creditCardId, userId);
+    }
+
+    const createdTransaction = await Transaction.findById(installmentIds[0], userId);
+    return createdTransaction;
   }
 
   /**
@@ -356,6 +396,10 @@ export class Transaction {
     }
 
     const updates = buildUpdates(data, allowedFields, { jsonFields: ['tags'] });
+    if (data.creditCardId !== undefined && data.creditCardId !== tx.creditCardId) {
+      updates.credit_card_cycle_id = null;
+      updates.accounting_date = null;
+    }
     if (newAmount !== null) {
       updates.amount = newAmount;
     }
@@ -421,6 +465,13 @@ export class Transaction {
       }
     });
 
+    if (data.creditCardId !== undefined || data.date !== undefined || data.purchaseDate !== undefined || data.status !== undefined) {
+      const updated = await knex('transactions').where({ id, user_id: userId }).first();
+      const { default: CreditCard } = await import('./CreditCard.js');
+      if (updated?.credit_card_id) await CreditCard.assignTransactionToCycle(id, updated.credit_card_id, userId);
+      if (tx.creditCardCycleId) await CreditCard.recalculateCycleTotal(tx.creditCardCycleId);
+    }
+
     return Transaction.findById(id, userId);
   }
 
@@ -454,6 +505,11 @@ export class Transaction {
       // Update balance
       await Account.updateBalance(tx.accountId, userId, trx);
     });
+
+    if (tx.creditCardCycleId) {
+      const { default: CreditCard } = await import('./CreditCard.js');
+      await CreditCard.recalculateCycleTotal(tx.creditCardCycleId);
+    }
 
     return { deleted: true };
   }
@@ -620,6 +676,9 @@ export class Transaction {
       payeeImageUrl: tx.payee_image_url,
       creditCardId: tx.credit_card_id,
       creditCardCycleId: tx.credit_card_cycle_id,
+      installmentGroupId: tx.installment_group_id,
+      installmentNumber: tx.installment_number != null ? Number(tx.installment_number) : null,
+      installmentCount: tx.installment_count != null ? Number(tx.installment_count) : null,
       amount: Number(tx.amount),
       description: tx.description,
       notes: tx.notes,

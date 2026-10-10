@@ -52,6 +52,7 @@ const baseTransactionSchema = {
  */
 export const createTransactionSchema = z.object({
   ...baseTransactionSchema,
+  installmentCount: z.coerce.number().int().min(1).max(36).default(1),
   // accountId can be null for transfers with external source
   accountId: z.string().uuid('Invalid account ID').nullable(),
   // For transfers (can be null or undefined)

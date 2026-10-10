@@ -41,8 +41,8 @@ function UserModal({ user, userGroups, onClose, onSave, groups, appDefaultLocale
     lastName: user?.lastName || '',
     role: user?.role || 'user',
     groupId: '',
-    locale: user?.locale || appDefaultLocale || 'fr',
-    currency: user?.currency || 'EUR',
+    locale: user?.locale || appDefaultLocale || 'pt',
+    currency: user?.currency || 'BRL',
   })
   // Pending groups for create mode (admin role)
   const [pendingGroups, setPendingGroups] = useState([])
@@ -318,6 +318,7 @@ function UserModal({ user, userGroups, onClose, onSave, groups, appDefaultLocale
                 onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                 className="input"
               >
+                <option value="BRL">BRL</option>
                 <option value="EUR">EUR</option>
                 <option value="USD">USD</option>
                 <option value="GBP">GBP</option>
@@ -545,7 +546,7 @@ export default function AdminUsers() {
     queryFn: () => adminApi.getSettings().then(r => r.data),
   })
 
-  const appDefaultLocale = settingsData?.data?.defaultLocale || 'fr'
+  const appDefaultLocale = settingsData?.data?.defaultLocale || 'pt'
 
   // Fetch user details (with groups) when editing
   const { data: userDetailData } = useQuery({

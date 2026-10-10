@@ -22,7 +22,7 @@ export default function AdminSettings() {
   const [formData, setFormData] = useState({
     publicRegistration: false,
     defaultGroupId: '',
-    defaultLocale: 'fr',
+    defaultLocale: 'pt',
     defaultDecimalSeparator: ',',
     defaultDigitGrouping: ' ',
   })
@@ -64,7 +64,7 @@ export default function AdminSettings() {
       setFormData({
         publicRegistration: settingsData.data.allowPublicRegistration ?? false,
         defaultGroupId: settingsData.data.defaultRegistrationGroupId || '',
-        defaultLocale: settingsData.data.defaultLocale || 'fr',
+        defaultLocale: settingsData.data.defaultLocale || 'pt',
         defaultDecimalSeparator: settingsData.data.defaultDecimalSeparator || ',',
         defaultDigitGrouping: settingsData.data.defaultDigitGrouping || ' ',
       })
@@ -419,7 +419,7 @@ export default function AdminSettings() {
             value={smtpData.smtpFrom}
             onChange={(e) => handleSmtpChange('smtpFrom', e.target.value)}
             className="input max-w-md"
-            placeholder="BudgetOS <noreply@example.com>"
+            placeholder="Carvalho <noreply@example.com>"
           />
         </div>
 
@@ -435,7 +435,7 @@ export default function AdminSettings() {
             value={smtpData.appUrl}
             onChange={(e) => handleSmtpChange('appUrl', e.target.value)}
             className="input max-w-md"
-            placeholder="https://budgetos.example.com"
+            placeholder="https://carvalho.example.com"
           />
         </div>
 

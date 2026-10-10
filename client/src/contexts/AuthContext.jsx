@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { authApi } from '../lib/api'
+import { authApi, workspaceApi, setWorkspaceRequestContext } from '../lib/api'
 import i18n from '../i18n'
 
 const AuthContext = createContext(null)
@@ -8,6 +8,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [userSettings, setUserSettings] = useState(null)
   const [userGroups, setUserGroups] = useState([])
+  const [workspaces, setWorkspaces] = useState([])
+  const [activeWorkspace, setActiveWorkspace] = useState(null)
   const [needsSetup, setNeedsSetup] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -20,6 +22,16 @@ export function AuthProvider({ children }) {
       const { data } = await authApi.getMe()
       setUser(data.data.user)
       setUserGroups(data.data.groups || [])
+      try {
+        const workspaceResponse = await workspaceApi.getAll()
+        setWorkspaces(workspaceResponse.data.data.workspaces || [])
+        setActiveWorkspace(workspaceResponse.data.data.activeWorkspace || null)
+        setWorkspaceRequestContext(workspaceResponse.data.data.activeWorkspace?.id)
+      } catch {
+        setWorkspaces([])
+        setActiveWorkspace(null)
+        setWorkspaceRequestContext(null)
+      }
       setNeedsSetup(false)
       if (data.data.user?.locale) i18n.changeLanguage(data.data.user.locale)
       // Load user settings
@@ -33,6 +45,8 @@ export function AuthProvider({ children }) {
       setUser(null)
       setUserSettings(null)
       setUserGroups([])
+      setWorkspaces([])
+      setActiveWorkspace(null)
       // Check if application needs initial setup
       try {
         const { data } = await authApi.getSetupStatus()
@@ -53,6 +67,7 @@ export function AuthProvider({ children }) {
   }
 
   const login = async (email, password) => {
+    setWorkspaceRequestContext(null)
     const { data } = await authApi.login({ email, password })
     // Reload full user data (user, settings, groups) via checkAuth
     await checkAuth()
@@ -60,6 +75,7 @@ export function AuthProvider({ children }) {
   }
 
   const register = async (userData) => {
+    setWorkspaceRequestContext(null)
     const { data } = await authApi.register(userData)
     // Reload full user data (user, settings, groups) via checkAuth
     await checkAuth()
@@ -71,12 +87,36 @@ export function AuthProvider({ children }) {
     setUser(null)
     setUserSettings(null)
     setUserGroups([])
+    setWorkspaces([])
+    setActiveWorkspace(null)
+    setWorkspaceRequestContext(null)
+  }
+
+  const switchWorkspace = async (workspaceId) => {
+    const { data } = await workspaceApi.activate(workspaceId)
+    const selected = data.data.workspace
+    setWorkspaceRequestContext(selected.id)
+    setActiveWorkspace(selected)
+    setWorkspaces((current) => current.map((workspace) => ({
+      ...workspace,
+      active: workspace.id === selected.id,
+    })))
+    return selected
+  }
+
+  const createWorkspace = async (workspaceData) => {
+    const { data } = await workspaceApi.create(workspaceData)
+    setWorkspaceRequestContext(data.data.workspace.id)
+    const { data: workspaceList } = await workspaceApi.getAll()
+    setWorkspaces(workspaceList.data.workspaces || [])
+    setActiveWorkspace(workspaceList.data.activeWorkspace || data.data.workspace)
+    return data.data.workspace
   }
 
   const isGroupAdmin = userGroups.some(g => g.memberRole === 'admin')
 
   return (
-    <AuthContext.Provider value={{ user, userSettings, userGroups, isGroupAdmin, needsSetup, loading, login, register, logout, checkAuth, updateSettings }}>
+    <AuthContext.Provider value={{ user, userSettings, userGroups, workspaces, activeWorkspace, isGroupAdmin, needsSetup, loading, login, register, logout, checkAuth, updateSettings, switchWorkspace, createWorkspace }}>
       {children}
     </AuthContext.Provider>
   )

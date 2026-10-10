@@ -586,6 +586,32 @@
       "detail": "Kategoriedetails"
     },
     "forecast": {
+          "bpo": {
+            "dre": "Betriebswirtschaftliche Auswertung",
+            "payables": "Zahlungen",
+            "receivables": "Eingänge",
+            "reconciliation": "Abgleich",
+            "cashflow": "Cashflow",
+            "accounting": "Buchhaltung",
+            "accountingTitle": "Management-Summen- und Saldenliste",
+            "nature": "Art",
+            "credit": "Haben",
+            "debit": "Soll",
+            "balance": "Periodensaldo",
+            "dreTitle": "Management-Ergebnisrechnung",
+            "netResult": "Nettoergebnis",
+            "income": "Erträge",
+            "expenses": "Aufwendungen",
+            "accountingGroup": "Kategorie",
+            "entries": "Buchungen",
+            "amount": "Betrag",
+            "noEntries": "Keine Buchungen im Zeitraum",
+            "dueWindow": "Fälligkeiten in den nächsten 90 Tagen",
+            "reconciliationTitle": "Nicht abgeglichene Buchungen",
+            "allReconciled": "Alle Buchungen sind abgeglichen",
+            "dueDate": "Datum",
+            "description": "Beschreibung"
+          },
       "currentBalance": "Aktueller Saldo",
       "in30days": "In 30 Tagen",
       "in60days": "In 60 Tagen",
@@ -644,6 +670,7 @@
         "zh": "中文"
       },
       "currencies": {
+          "BRL": "Brasilianischer Real (R$)",
         "EUR": "Euro (€)",
         "USD": "Dollar ($)",
         "GBP": "Britisches Pfund (£)",

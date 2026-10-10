@@ -586,6 +586,32 @@
       "detail": "Kategoridetaljering"
     },
     "forecast": {
+          "bpo": {
+            "dre": "Resultatrapport",
+            "payables": "Att betala",
+            "receivables": "Att få betalt",
+            "reconciliation": "Avstämning",
+            "cashflow": "Kassaflöde",
+            "accounting": "Redovisning",
+            "accountingTitle": "Resultat- och balansrapport",
+            "nature": "Typ",
+            "credit": "Kredit",
+            "debit": "Debet",
+            "balance": "Periodsaldo",
+            "dreTitle": "Resultatrapport för verksamheten",
+            "netResult": "Nettoresultat",
+            "income": "Intäkter",
+            "expenses": "Kostnader",
+            "accountingGroup": "Kategori",
+            "entries": "Transaktioner",
+            "amount": "Belopp",
+            "noEntries": "Inga transaktioner under perioden",
+            "dueWindow": "Förfallodatum under de kommande 90 dagarna",
+            "reconciliationTitle": "Ej avstämda transaktioner",
+            "allReconciled": "Alla transaktioner är avstämda",
+            "dueDate": "Datum",
+            "description": "Beskrivning"
+          },
       "currentBalance": "Aktuellt saldo",
       "in30days": "Om 30 dagar",
       "in60days": "Om 60 dagar",
@@ -644,6 +670,7 @@
         "sv": "Svenska"
       },
       "currencies": {
+          "BRL": "Brasiliansk real (R$)",
         "EUR": "Euro (€)",
         "USD": "Dollar ($)",
         "GBP": "Brittiskt pund (£)",

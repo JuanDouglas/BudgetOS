@@ -198,10 +198,10 @@ function PreferencesSettings({ user, checkAuth }) {
   const toast = useToast()
   const { userSettings, updateSettings } = useAuth()
   const [formData, setFormData] = useState({
-    locale: user?.locale || 'fr',
-    currency: user?.currency || 'EUR',
+    locale: user?.locale || 'pt',
+    currency: user?.currency || 'BRL',
     decimalSeparator: user?.decimalSeparator || ',',
-    digitGrouping: user?.digitGrouping ?? ' ',
+    digitGrouping: user?.digitGrouping ?? '.',
   })
   const [settingsData, setSettingsData] = useState({
     weekStartDay: userSettings?.weekStartDay ?? 1,
@@ -245,7 +245,11 @@ function PreferencesSettings({ user, checkAuth }) {
           <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.preferences.language')}</label>
           <FormLanguageSelect
             value={formData.locale}
-            onChange={(locale) => setFormData({ ...formData, locale })}
+            onChange={(locale) => setFormData({
+              ...formData,
+              locale,
+              ...(locale === 'pt' ? { currency: 'BRL', decimalSeparator: ',', digitGrouping: '.' } : {}),
+            })}
           />
         </div>
         <div>
@@ -255,6 +259,7 @@ function PreferencesSettings({ user, checkAuth }) {
             onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
             className="input"
           >
+            <option value="BRL">{t('settings.preferences.currencies.BRL')}</option>
             <option value="EUR">{t('settings.preferences.currencies.EUR')}</option>
             <option value="USD">{t('settings.preferences.currencies.USD')}</option>
             <option value="GBP">{t('settings.preferences.currencies.GBP')}</option>

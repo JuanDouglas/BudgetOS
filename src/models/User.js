@@ -51,11 +51,22 @@ export class User {
    * @param {Object} trx - Knex transaction
    * @param {string} userId - User ID
    */
-  static async _insertDefaults(trx, userId) {
+  static async _insertDefaults(trx, userId, locale = 'fr') {
     await trx('user_settings').insert({ id: generateId(), user_id: userId });
+    const portugueseCategoryNames = {
+      Salaire: 'Salário', Primes: 'Bônus', Remboursements: 'Reembolsos',
+      'Autres revenus': 'Outras receitas', Loyer: 'Aluguel', Électricité: 'Eletricidade',
+      Eau: 'Água', Téléphone: 'Telefone', Carburant: 'Combustível',
+      Transports: 'Transporte', 'Entretien véhicule': 'Manutenção do veículo',
+      Courses: 'Compras', Restaurant: 'Restaurante', Santé: 'Saúde', Loisirs: 'Lazer',
+      Abonnements: 'Assinaturas', Vêtements: 'Vestuário', Impôts: 'Impostos',
+      Banque: 'Tarifas bancárias', Divers: 'Diversos',
+      'Virement interne': 'Transferência interna', Épargne: 'Poupança',
+    };
     const categories = defaultCategories.map((cat, index) => ({
       id: generateId(), user_id: userId,
-      name: cat.name, type: cat.type,
+      name: locale === 'pt' ? portugueseCategoryNames[cat.name] || cat.name : cat.name,
+      type: cat.type,
       icon: cat.icon, color: cat.color, sort_order: index,
     }));
     await trx('categories').insert(categories);
@@ -86,7 +97,7 @@ export class User {
 
       await trx('users').insert(userRow);
 
-      await User._insertDefaults(trx, id);
+      await User._insertDefaults(trx, id, locale);
     });
 
     return User.findById(id);
@@ -100,7 +111,7 @@ export class User {
       .select('id', 'email', 'first_name', 'last_name', 'role', 'locale', 'currency', 'timezone',
         'decimal_separator', 'digit_grouping',
         'is_active', 'email_verified', 'last_login_at', 'created_at', 'updated_at')
-      .where({ id, is_active: true })
+      .where({ id, is_active: true, is_workspace_identity: false })
       .first();
 
     return user ? User.format(user) : null;
@@ -114,7 +125,7 @@ export class User {
       .select('id', 'email', 'first_name', 'last_name', 'role', 'locale', 'currency', 'timezone',
         'decimal_separator', 'digit_grouping',
         'is_active', 'email_verified', 'last_login_at', 'created_at', 'updated_at')
-      .where({ id })
+      .where({ id, is_workspace_identity: false })
       .first();
 
     return user ? User.format(user) : null;
@@ -128,7 +139,7 @@ export class User {
       .select('id', 'email', 'password_hash', 'first_name', 'last_name', 'role', 'locale',
         'currency', 'timezone', 'decimal_separator', 'digit_grouping',
         'is_active', 'email_verified', 'last_login_at', 'created_at', 'updated_at')
-      .where({ email: email.toLowerCase() })
+      .where({ email: email.toLowerCase(), is_workspace_identity: false })
       .first();
 
     return user ? { ...User.format(user), passwordHash: user.password_hash } : null;
@@ -177,6 +188,8 @@ export class User {
    * Deactivate user
    */
   static async deactivate(id) {
+    const user = await knex('users').where({ id, is_workspace_identity: false }).first();
+    if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
     await knex('users').where('id', id).update({ is_active: false });
   }
 
@@ -186,13 +199,19 @@ export class User {
    * force the caller through an explicit two-step intent.
    */
   static async delete(id) {
-    const user = await knex('users').where('id', id).first();
+    const user = await knex('users').where({ id, is_workspace_identity: false }).first();
     if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
     if (user.is_active) {
       throw new BadRequestError(
         'User must be suspended before permanent deletion',
         'USER_MUST_BE_SUSPENDED'
       );
+    }
+    const workspaceDataUsers = await knex('client_workspaces')
+      .where({ created_by: id, is_personal: false })
+      .pluck('data_user_id');
+    if (workspaceDataUsers.length > 0) {
+      await knex('users').whereIn('id', workspaceDataUsers).del();
     }
     await knex('users').where('id', id).del();
   }
@@ -201,7 +220,7 @@ export class User {
    * Reactivate a deactivated user
    */
   static async reactivate(id) {
-    const user = await knex('users').where('id', id).first();
+    const user = await knex('users').where({ id, is_workspace_identity: false }).first();
     if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
     await knex('users').where('id', id).update({ is_active: true });
     return User.findByIdAny(id);
@@ -213,7 +232,7 @@ export class User {
    * @param {string} role - New role ('user', 'admin', 'super_admin')
    */
   static async updateRole(id, role) {
-    const user = await knex('users').where('id', id).first();
+    const user = await knex('users').where({ id, is_workspace_identity: false }).first();
     if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
     await knex('users').where('id', id).update({ role });
     return User.findByIdAny(id);
@@ -275,7 +294,7 @@ export class User {
 
       await trx('users').insert(userRow);
 
-      await User._insertDefaults(trx, id);
+      await User._insertDefaults(trx, id, locale || 'fr');
     });
 
     return User.findById(id);
@@ -294,6 +313,7 @@ export class User {
     const offset = (page - 1) * limit;
 
     let query = knex('users')
+      .where('users.is_workspace_identity', false)
       .select('users.id', 'users.email', 'users.first_name', 'users.last_name', 'users.role',
         'users.locale', 'users.currency', 'users.decimal_separator', 'users.digit_grouping',
         'users.is_active', 'users.email_verified',

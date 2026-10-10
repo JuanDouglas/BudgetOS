@@ -12,7 +12,7 @@ export function up(knex) {
     table.string('account_number');
     table.decimal('initial_balance', 15, 2).defaultTo(0);
     table.decimal('current_balance', 15, 2).defaultTo(0);
-    table.string('currency').defaultTo('EUR');
+    table.string('currency').defaultTo('BRL');
     table.string('color').defaultTo('#3B82F6');
     table.string('icon').defaultTo('wallet');
     table.boolean('is_active').defaultTo(true);

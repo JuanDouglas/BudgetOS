@@ -119,6 +119,35 @@ describe('Planned Transactions - Occurrence', () => {
     expect(res.status).toBe(201)
     expect(res.body.success).toBe(true)
   })
+
+  it('reconciles a past planned transfer without exhausting the SQLite pool', async () => {
+    const destinationResponse = await agent
+      .post('/api/v1/accounts')
+      .set('X-CSRF-Token', csrfToken)
+      .send({ name: 'Transfer destination', type: 'savings' })
+    const destinationAccountId = destinationResponse.body.data.account.id
+    const plannedResponse = await agent
+      .post('/api/v1/planned-transactions')
+      .set('X-CSRF-Token', csrfToken)
+      .send(makePlanned({
+        type: 'transfer',
+        amount: 25,
+        description: 'Scheduled transfer',
+        frequency: 'once',
+        startDate: '2026-10-01',
+        toAccountId: destinationAccountId,
+      }))
+    const plannedId = plannedResponse.body.data.plannedTransaction.id
+
+    const response = await agent
+      .post(`/api/v1/planned-transactions/${plannedId}/reconcile`)
+      .set('X-CSRF-Token', csrfToken)
+
+    expect(response.status).toBe(200)
+    expect(response.body.data.created).toBe(1)
+    const transactions = await agent.get(`/api/v1/transactions?search=Scheduled%20transfer`)
+    expect(transactions.body.data).toHaveLength(2)
+  })
 })
 
 describe('Planned Transactions - Validation', () => {

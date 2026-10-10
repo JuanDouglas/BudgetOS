@@ -7,13 +7,13 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export async function up(knex) {
   await knex.schema.alterTable('groups', (table) => {
-    table.string('default_locale', 10).defaultTo('fr');
+    table.string('default_locale', 10).defaultTo('pt');
   });
 
   await knex('system_settings').insert({
     id: uuidv4(),
     key: 'default_locale',
-    value: 'fr',
+    value: 'pt',
   });
 }
 

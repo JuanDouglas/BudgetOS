@@ -10,7 +10,7 @@ import ru from './locales/ru.json'
 import sv from './locales/sv.json'
 import zh from './locales/zh.json'
 
-const savedLang = localStorage.getItem('budgetos-lang') || 'fr'
+const savedLang = localStorage.getItem('budgetos-lang') || 'pt'
 
 i18n.use(initReactI18next).init({
   resources: {
@@ -25,7 +25,7 @@ i18n.use(initReactI18next).init({
     zh: { translation: zh },
   },
   lng: savedLang,
-  fallbackLng: 'fr',
+  fallbackLng: 'pt',
   interpolation: { escapeValue: false },
 })
 

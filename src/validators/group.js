@@ -58,7 +58,7 @@ export const addMemberSchema = z.object({
   lastName: z.string().max(100).trim().optional(),
   role: z.enum(['admin', 'member']).default('member'),
   locale: z.enum(['fr', 'en', 'de', 'es', 'it', 'pt', 'ru', 'sv', 'zh']).optional(),
-  currency: z.enum(['EUR', 'USD', 'GBP', 'CHF']).optional(),
+  currency: z.enum(['BRL', 'EUR', 'USD', 'GBP', 'CHF']).optional(),
 });
 
 /**

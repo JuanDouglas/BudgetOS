@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { BRAND } from '../lib/brand'
 import { Lock, ArrowLeft, CheckCircle, AlertCircle, XCircle } from 'lucide-react'
 import { authApi, preloadCsrfToken } from '../lib/api'
 import PasswordInput from '../components/PasswordInput'
@@ -156,7 +157,7 @@ export default function ResetPassword() {
           {/* Logo */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-100 mb-4">
-              <span className="text-2xl font-bold text-primary-600">B</span>
+              <span className="text-2xl font-bold text-primary-600">{BRAND.mark}</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-900">{t('auth.resetPassword.title')}</h1>
             <p className="text-gray-600 mt-2">{t('auth.resetPassword.subtitle')}</p>

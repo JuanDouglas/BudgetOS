@@ -21,14 +21,18 @@ export function cn(...inputs) {
 /**
  * Formats a number as currency
  * @param {number} amount - The amount to format
- * @param {string} currency - ISO 4217 currency code (default: 'EUR')
+ * @param {string} currency - ISO 4217 currency code (default: 'BRL')
  * @returns {string} Formatted currency string (e.g., "1 234,56 €")
  * @example
- * formatCurrency(1234.56) // => "1 234,56 €"
+ * formatCurrency(1234.56) // => "R$ 1.234,56"
  * formatCurrency(1234.56, 'USD') // => "1 234,56 $US"
  */
-export function formatCurrency(amount, currency = 'EUR', locale = 'fr') {
-  const intlLocale = locale === 'fr' ? 'fr-FR' : 'en-US'
+export function formatCurrency(amount, currency = 'BRL', locale = 'pt') {
+  const intlLocales = {
+    de: 'de-DE', en: 'en-US', es: 'es-ES', fr: 'fr-FR', it: 'it-IT',
+    pt: 'pt-BR', ru: 'ru-RU', sv: 'sv-SE', zh: 'zh-CN',
+  }
+  const intlLocale = intlLocales[locale] || 'en-US'
   return new Intl.NumberFormat(intlLocale, {
     style: 'currency',
     currency,
@@ -54,14 +58,18 @@ export function parseLocalDate(date) {
 }
 
 /**
- * Formats a date in French locale (dd/MM/yyyy)
+ * Formats a date in Brazilian Portuguese locale (dd/MM/yyyy)
  * @param {string|Date} date - Date to format
  * @returns {string} Formatted date string (e.g., "20/01/2026")
  * @example
  * formatDate('2026-01-20') // => "20/01/2026"
  */
-export function formatDate(date, locale = 'fr') {
-  const intlLocale = locale === 'fr' ? 'fr-FR' : 'en-US'
+export function formatDate(date, locale = 'pt') {
+  const intlLocales = {
+    de: 'de-DE', en: 'en-US', es: 'es-ES', fr: 'fr-FR', it: 'it-IT',
+    pt: 'pt-BR', ru: 'ru-RU', sv: 'sv-SE', zh: 'zh-CN',
+  }
+  const intlLocale = intlLocales[locale] || 'en-US'
   return new Intl.DateTimeFormat(intlLocale, {
     day: '2-digit',
     month: '2-digit',

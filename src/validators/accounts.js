@@ -31,7 +31,7 @@ export const createAccountSchema = z.object({
     .number()
     .finite('Invalid amount')
     .default(0),
-  currency: z.enum(['EUR', 'USD', 'GBP', 'CHF', 'CAD']).default('EUR'),
+  currency: z.enum(['BRL', 'EUR', 'USD', 'GBP', 'CHF', 'CAD']).default('BRL'),
   color: z
     .string()
     .regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid color format')

@@ -18,7 +18,7 @@ export class Account {
       id, user_id: userId, name: data.name, type: data.type,
       institution: data.institution || null, account_number: data.accountNumber || null,
       initial_balance: data.initialBalance || 0, current_balance: data.initialBalance || 0,
-      currency: data.currency || 'EUR', color: data.color || '#3B82F6',
+      currency: data.currency || 'BRL', color: data.color || '#3B82F6',
       icon: data.icon || 'wallet',
       is_included_in_total: data.isIncludedInTotal !== false,
       notes: data.notes || null, sort_order: data.sortOrder || 0,
@@ -30,8 +30,9 @@ export class Account {
   /**
    * Find account by ID (active accounts only)
    */
-  static async findById(id, userId) {
-    const account = await knex('accounts')
+  static async findById(id, userId, trx = null) {
+    const db = trx || knex;
+    const account = await db('accounts')
       .where({ id, user_id: userId, is_active: true })
       .first();
 
@@ -41,8 +42,8 @@ export class Account {
   /**
    * Find account by ID or throw (active accounts only)
    */
-  static async findByIdOrFail(id, userId) {
-    const account = await Account.findById(id, userId);
+  static async findByIdOrFail(id, userId, trx = null) {
+    const account = await Account.findById(id, userId, trx);
     if (!account) throw new NotFoundError('Account not found', 'ACCOUNT_NOT_FOUND');
     return account;
   }

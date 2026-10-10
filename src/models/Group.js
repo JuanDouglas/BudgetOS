@@ -26,9 +26,9 @@ export class Group {
       is_active: true,
       created_by: createdBy,
     };
-    if (defaultLocale !== undefined) row.default_locale = defaultLocale;
-    if (defaultDecimalSeparator !== undefined) row.default_decimal_separator = defaultDecimalSeparator;
-    if (defaultDigitGrouping !== undefined) row.default_digit_grouping = defaultDigitGrouping;
+    row.default_locale = defaultLocale || 'pt';
+    row.default_decimal_separator = defaultDecimalSeparator || ',';
+    row.default_digit_grouping = defaultDigitGrouping ?? (row.default_locale === 'pt' ? '.' : ' ');
 
     await knex('groups').insert(row);
 
@@ -383,7 +383,7 @@ export class Group {
       id: group.id,
       name: group.name,
       description: group.description,
-      defaultLocale: group.default_locale || 'fr',
+      defaultLocale: group.default_locale || 'pt',
       defaultDecimalSeparator: group.default_decimal_separator || ',',
       defaultDigitGrouping: group.default_digit_grouping || ' ',
       isActive: Boolean(group.is_active),

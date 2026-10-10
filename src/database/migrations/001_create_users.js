@@ -10,8 +10,8 @@ export function up(knex) {
       table.string('first_name');
       table.string('last_name');
       table.string('role').defaultTo('user');
-      table.string('locale').defaultTo('fr');
-      table.string('currency').defaultTo('EUR');
+      table.string('locale').defaultTo('pt');
+      table.string('currency').defaultTo('BRL');
       table.string('timezone').defaultTo('Europe/Paris');
       table.boolean('is_active').defaultTo(true);
       table.boolean('email_verified').defaultTo(false);

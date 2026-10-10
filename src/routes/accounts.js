@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as accountController from '../controllers/accountController.js';
 import { requireAuth } from '../middleware/auth.js';
+import { resolveWorkspaceContext } from '../middleware/workspaceContext.js';
 import { validate } from '../middleware/validation.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { createAccountSchema, updateAccountSchema, accountIdParamSchema, listAccountsQuerySchema } from '../validators/accounts.js';
@@ -8,6 +9,7 @@ import { createAccountSchema, updateAccountSchema, accountIdParamSchema, listAcc
 const router = Router();
 
 router.use(requireAuth);
+router.use(resolveWorkspaceContext);
 
 router.post('/', validate({ body: createAccountSchema }), asyncHandler(accountController.createAccount));
 router.get('/', validate({ query: listAccountsQuerySchema }), asyncHandler(accountController.getAccounts));

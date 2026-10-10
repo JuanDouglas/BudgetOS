@@ -27,16 +27,22 @@ describe('cn', () => {
 })
 
 describe('formatCurrency', () => {
-  it('formats EUR by default', () => {
+  it('formats Brazilian real by default', () => {
     const result = formatCurrency(1234.56)
-    expect(result).toMatch(/1[\s\u202f]234,56/)
-    expect(result).toMatch(/€/)
+    expect(result).toMatch(/1\.234,56/)
+    expect(result).toMatch(/R\$/)
   })
 
   it('formats USD', () => {
     const result = formatCurrency(1234.56, 'USD')
-    expect(result).toMatch(/1[\s\u202f]234,56/)
+    expect(result).toMatch(/1\.234,56/)
     expect(result).toMatch(/\$/)
+  })
+
+  it('formats Brazilian real using Brazilian locale conventions', () => {
+    const result = formatCurrency(1234.56, 'BRL', 'pt')
+    expect(result).toMatch(/1\.234,56/)
+    expect(result).toMatch(/R\$/)
   })
 
   it('handles negative amounts', () => {
@@ -48,6 +54,10 @@ describe('formatCurrency', () => {
 describe('formatDate', () => {
   it('formats date in French locale', () => {
     expect(formatDate('2026-01-20')).toBe('20/01/2026')
+  })
+
+  it('formats date in Brazilian Portuguese locale', () => {
+    expect(formatDate('2026-01-20', 'pt')).toBe('20/01/2026')
   })
 
   it('handles Date objects', () => {

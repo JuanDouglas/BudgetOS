@@ -3,17 +3,19 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { reportsApi } from '../lib/api'
 import { useFormatters } from '../hooks/useFormatters'
-import { PieChart, TrendingUp, Calendar } from 'lucide-react'
+import { formatLocalDate } from '../lib/utils'
+import { PieChart, TrendingUp } from 'lucide-react'
+import { FileText, ArrowDownToLine, ArrowUpFromLine, Download, Scale } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart as RechartsPie, Pie, Cell, LineChart, Line
 } from 'recharts'
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+const COLORS = ['#12284d', '#cca761', '#526989', '#dfc58d', '#233c63', '#b1904e', '#71809a', '#e9dcbd']
 
 export default function Reports() {
   const { t } = useTranslation()
-  const [activeTab, setActiveTab] = useState('trend')
+  const [activeTab, setActiveTab] = useState('dre')
 
   return (
     <div className="space-y-6">
@@ -23,11 +25,14 @@ export default function Reports() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-2 overflow-x-auto border-b">
         {[
+          { id: 'dre', label: t('reports.forecast.bpo.dre', { defaultValue: 'DRE gerencial' }), icon: FileText },
+          { id: 'accounting', label: t('reports.forecast.bpo.accounting', { defaultValue: 'Contábil' }), icon: Scale },
+          { id: 'payables', label: t('reports.forecast.bpo.payables', { defaultValue: 'A pagar/receber' }), icon: ArrowDownToLine },
+          { id: 'forecast', label: t('reports.forecast.bpo.cashflow', { defaultValue: 'Fluxo de caixa' }), icon: ArrowUpFromLine },
           { id: 'trend', label: t('reports.tabs.trend'), icon: TrendingUp },
           { id: 'categories', label: t('reports.tabs.categories'), icon: PieChart },
-          { id: 'forecast', label: t('reports.tabs.forecast'), icon: Calendar },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -44,11 +49,259 @@ export default function Reports() {
         ))}
       </div>
 
+      {activeTab === 'dre' && <IncomeStatement />}
+      {activeTab === 'accounting' && <AccountingTrialBalance />}
+      {activeTab === 'payables' && <PayablesReceivables />}
       {activeTab === 'trend' && <MonthlyTrend />}
       {activeTab === 'categories' && <CategoryBreakdown />}
       {activeTab === 'forecast' && <Forecast />}
     </div>
   )
+}
+
+function IncomeStatement() {
+  const { t } = useTranslation()
+  const { formatCurrency, formatDate } = useFormatters()
+  const period = currentMonthPeriod()
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['bpo-income-statement', period.startDate, period.endDate],
+    queryFn: async () => {
+      const [incomeResponse, expenseResponse] = await Promise.all([
+        reportsApi.getIncomeByCategory(period),
+        reportsApi.getExpensesByCategory(period),
+      ])
+      return {
+        income: incomeResponse.data.data.income || [],
+        expenses: expenseResponse.data.data.expenses || [],
+      }
+    },
+  })
+
+  if (isLoading) return <LoadingState />
+  if (error) return <ErrorState error={error} />
+
+  const incomeTotal = data.income.reduce((total, item) => total + Number(item.total), 0)
+  const expenseTotal = data.expenses.reduce((total, item) => total + Number(item.total), 0)
+  const rows = [
+    ...data.income.map((item) => ({ ...item, kind: 'income' })),
+    ...data.expenses.map((item) => ({ ...item, kind: 'expense' })),
+  ]
+
+  return (
+    <div className="card overflow-x-auto">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">{t('reports.forecast.bpo.dreTitle', { defaultValue: 'DRE gerencial' })}</h3>
+          <p className="text-sm text-gray-500">{formatDate(period.startDate)} - {formatDate(period.endDate)}</p>
+        </div>
+        <div className="flex items-end gap-5">
+          <ExportButton headers={['Natureza', 'Categoria', 'Lançamentos', 'Valor']} rows={rows.map((item) => [item.kind === 'income' ? 'Receita' : 'Despesa', item.categoryName, item.count, item.total])} fileName="dre-gerencial.csv" />
+          <div className="text-right">
+          <p className="text-sm text-gray-500">{t('reports.forecast.bpo.netResult', { defaultValue: 'Resultado líquido' })}</p>
+          <p className="text-xl font-bold">{formatCurrency(incomeTotal - expenseTotal)}</p>
+          </div>
+        </div>
+      </div>
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <SummaryValue label={t('reports.forecast.bpo.income', { defaultValue: 'Receitas' })} value={incomeTotal} formatCurrency={formatCurrency} />
+        <SummaryValue label={t('reports.forecast.bpo.expenses', { defaultValue: 'Despesas' })} value={expenseTotal} formatCurrency={formatCurrency} />
+      </div>
+      <table className="w-full text-sm">
+        <thead className="border-b text-left text-gray-500">
+          <tr>
+            <th className="py-2 font-medium">{t('reports.forecast.bpo.accountingGroup', { defaultValue: 'Grupo' })}</th>
+            <th className="py-2 text-right font-medium">{t('reports.forecast.bpo.entries', { defaultValue: 'Lançamentos' })}</th>
+            <th className="py-2 text-right font-medium">{t('reports.forecast.bpo.amount', { defaultValue: 'Valor' })}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {rows.map((item, index) => (
+            <tr key={`${item.kind}-${item.categoryId || index}`}>
+              <td className="py-2.5">{item.categoryName}</td>
+              <td className="py-2.5 text-right text-gray-500">{item.count}</td>
+              <td className="py-2.5 text-right font-medium">{formatCurrency(item.total)}</td>
+            </tr>
+          ))}
+          {rows.length === 0 && <EmptyRow colSpan={3} label={t('reports.forecast.bpo.noEntries', { defaultValue: 'Sem lançamentos no período' })} />}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function AccountingTrialBalance() {
+  const { t } = useTranslation()
+  const { formatCurrency, formatDate } = useFormatters()
+  const period = currentMonthPeriod()
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['bpo-accounting-trial-balance', period.startDate, period.endDate],
+    queryFn: async () => {
+      const [incomeResponse, expenseResponse] = await Promise.all([
+        reportsApi.getIncomeByCategory(period),
+        reportsApi.getExpensesByCategory(period),
+      ])
+      return [
+        ...(incomeResponse.data.data.income || []).map((item) => ({ ...item, nature: 'Crédito', kind: 'Receita' })),
+        ...(expenseResponse.data.data.expenses || []).map((item) => ({ ...item, nature: 'Débito', kind: 'Despesa' })),
+      ]
+    },
+  })
+
+  if (isLoading) return <LoadingState />
+  if (error) return <ErrorState error={error} />
+
+  const credits = data.filter((row) => row.nature === 'Crédito').reduce((sum, row) => sum + Number(row.total), 0)
+  const debits = data.filter((row) => row.nature === 'Débito').reduce((sum, row) => sum + Number(row.total), 0)
+
+  return (
+    <div className="card overflow-x-auto">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">{t('reports.forecast.bpo.accountingTitle', { defaultValue: 'Balancete gerencial' })}</h3>
+          <p className="text-sm text-gray-500">{formatDate(period.startDate)} - {formatDate(period.endDate)}</p>
+        </div>
+        <ExportButton headers={['Grupo', 'Natureza', 'Categoria', 'Lançamentos', 'Valor']} rows={data.map((row) => [row.kind, row.nature, row.categoryName, row.count, row.total])} fileName="balancete-gerencial.csv" />
+      </div>
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <SummaryValue label={t('reports.forecast.bpo.credit', { defaultValue: 'Créditos' })} value={credits} formatCurrency={formatCurrency} />
+        <SummaryValue label={t('reports.forecast.bpo.debit', { defaultValue: 'Débitos' })} value={debits} formatCurrency={formatCurrency} />
+        <SummaryValue label={t('reports.forecast.bpo.balance', { defaultValue: 'Saldo do período' })} value={credits - debits} formatCurrency={formatCurrency} />
+      </div>
+      <table className="w-full text-sm">
+        <thead className="border-b text-left text-gray-500">
+          <tr>
+            <th className="py-2 font-medium">{t('reports.forecast.bpo.accountingGroup', { defaultValue: 'Categoria' })}</th>
+            <th className="py-2 font-medium">{t('reports.forecast.bpo.nature', { defaultValue: 'Natureza' })}</th>
+            <th className="py-2 text-right font-medium">{t('reports.forecast.bpo.entries', { defaultValue: 'Lançamentos' })}</th>
+            <th className="py-2 text-right font-medium">{t('reports.forecast.bpo.amount', { defaultValue: 'Valor' })}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {data.map((row, index) => (
+            <tr key={`${row.kind}-${row.categoryId || index}`}>
+              <td className="py-2.5">{row.categoryName}</td>
+              <td className="py-2.5">{t(`reports.forecast.bpo.${row.nature.toLowerCase()}`, { defaultValue: row.nature })}</td>
+              <td className="py-2.5 text-right text-gray-500">{row.count}</td>
+              <td className="py-2.5 text-right font-medium">{formatCurrency(row.total)}</td>
+            </tr>
+          ))}
+          {data.length === 0 && <EmptyRow colSpan={4} label={t('reports.forecast.bpo.noEntries', { defaultValue: 'Sem lançamentos no período' })} />}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function PayablesReceivables() {
+  const { t } = useTranslation()
+  const { formatCurrency, formatDate } = useFormatters()
+  const startDate = formatLocalDate(new Date())
+  const dueDate = new Date()
+  dueDate.setDate(dueDate.getDate() + 90)
+  const endDate = formatLocalDate(dueDate)
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['bpo-payables-receivables', startDate, endDate],
+    queryFn: () => reportsApi.getForecastTransactions({ startDate, endDate, limit: 500 })
+      .then((response) => response.data.data.data || []),
+  })
+
+  if (isLoading) return <LoadingState />
+  if (error) return <ErrorState error={error} />
+
+  const pending = data.filter((item) => item.source === 'projected' || item.status === 'pending')
+  const payables = pending.filter((item) => item.type === 'expense')
+  const receivables = pending.filter((item) => item.type === 'income')
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-gray-500">{t('reports.forecast.bpo.dueWindow', { defaultValue: 'Vencimentos previstos para os próximos 90 dias' })}</p>
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <TransactionList title={t('reports.forecast.bpo.payables', { defaultValue: 'Contas a pagar' })} transactions={payables} formatCurrency={formatCurrency} formatDate={formatDate} exportFileName="contas-a-pagar.csv" />
+        <TransactionList title={t('reports.forecast.bpo.receivables', { defaultValue: 'Contas a receber' })} transactions={receivables} formatCurrency={formatCurrency} formatDate={formatDate} exportFileName="contas-a-receber.csv" />
+      </div>
+    </div>
+  )
+}
+
+function TransactionList({ title, transactions, formatCurrency, formatDate, exportFileName }) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="card overflow-x-auto">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="text-lg font-semibold">{title}</h3>
+        <ExportButton headers={['Data', 'Descrição', 'Conta/Categoria', 'Valor', 'Status']} rows={transactions.map((item) => [item.date, item.description, item.payeeName || item.accountName || item.categoryName || '', item.amount, item.status])} fileName={exportFileName} />
+      </div>
+      <table className="w-full text-sm">
+        <thead className="border-b text-left text-gray-500">
+          <tr>
+            <th className="py-2 font-medium">{t('reports.forecast.bpo.dueDate', { defaultValue: 'Data' })}</th>
+            <th className="py-2 font-medium">{t('reports.forecast.bpo.description', { defaultValue: 'Descrição' })}</th>
+            <th className="py-2 text-right font-medium">{t('reports.forecast.bpo.amount', { defaultValue: 'Valor' })}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {transactions.map((item) => (
+            <tr key={item.id}>
+              <td className="whitespace-nowrap py-2.5">{formatDate(item.date)}</td>
+              <td className="py-2.5">
+                <p className="font-medium">{item.description}</p>
+                <p className="text-xs text-gray-500">{item.payeeName || item.accountName || item.categoryName || ''}</p>
+              </td>
+              <td className="whitespace-nowrap py-2.5 text-right font-medium">{formatCurrency(item.amount)}</td>
+            </tr>
+          ))}
+          {transactions.length === 0 && <EmptyRow colSpan={3} label={t('reports.forecast.bpo.noEntries', { defaultValue: 'Sem lançamentos' })} />}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function SummaryValue({ label, value, formatCurrency }) {
+  return (
+    <div className="rounded-md bg-gray-50 px-4 py-3">
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-lg font-semibold">{formatCurrency(value)}</p>
+    </div>
+  )
+}
+
+function EmptyRow({ colSpan, label }) {
+  return <tr><td colSpan={colSpan} className="py-8 text-center text-gray-500">{label}</td></tr>
+}
+
+function ExportButton({ headers, rows, fileName }) {
+  const { t } = useTranslation()
+
+  const download = () => {
+    const escapeCsv = (value) => {
+      const normalized = typeof value === 'number' ? value.toFixed(2).replace('.', ',') : String(value ?? '')
+      return `"${normalized.replace(/"/g, '""')}"`
+    }
+    const content = [headers, ...rows].map((row) => row.map(escapeCsv).join(';')).join('\r\n')
+    const blob = new Blob([`\uFEFF${content}`], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = fileName
+    anchor.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
+  return (
+    <button type="button" onClick={download} className="inline-flex shrink-0 items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50" title={t('common.export')}>
+      <Download className="h-4 w-4" />
+      <span>{t('common.export')}</span>
+    </button>
+  )
+}
+
+function currentMonthPeriod() {
+  const now = new Date()
+  const startDate = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 1))
+  const endDate = formatLocalDate(new Date(now.getFullYear(), now.getMonth() + 1, 0))
+  return { startDate, endDate }
 }
 
 function MonthlyTrend() {
@@ -64,7 +317,10 @@ function MonthlyTrend() {
 
   return (
     <div className="card">
-      <h3 className="text-lg font-semibold mb-6">{t('reports.trend.title')}</h3>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h3 className="text-lg font-semibold">{t('reports.trend.title')}</h3>
+        <ExportButton headers={['Mês', 'Receitas', 'Despesas', 'Resultado']} rows={(data || []).map((row) => [row.monthLabel, row.income, row.expenses, row.netFlow])} fileName="tendencia-mensal.csv" />
+      </div>
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data}>
@@ -75,8 +331,8 @@ function MonthlyTrend() {
               formatter={(value) => formatCurrency(value)}
               contentStyle={{ borderRadius: '8px' }}
             />
-            <Bar dataKey="income" name={t('reports.trend.income')} fill="#10b981" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="expenses" name={t('reports.trend.expenses')} fill="#ef4444" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="income" name={t('reports.trend.income')} fill="#12284d" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="expenses" name={t('reports.trend.expenses')} fill="#cca761" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -128,7 +384,10 @@ function CategoryBreakdown() {
       </div>
 
       <div className="card">
-        <h3 className="text-lg font-semibold mb-6">{t('reports.categoryBreakdown.detail')}</h3>
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold">{t('reports.categoryBreakdown.detail')}</h3>
+          <ExportButton headers={['Categoria', 'Lançamentos', 'Percentual', 'Valor']} rows={(data || []).map((row) => [row.categoryName, row.count, row.percentage, row.total])} fileName="despesas-por-categoria.csv" />
+        </div>
         <div className="space-y-4">
           {data?.slice(0, 8).map((cat, i) => (
             <div key={cat.categoryId || i} className="flex items-center gap-3">
@@ -159,7 +418,7 @@ function Forecast() {
   if (error) return <ErrorState error={error} />
 
   const chartData = data?.dailyBalances?.filter((_, i) => i % 7 === 0) || []
-  const intlLocale = locale === 'fr' ? 'fr-FR' : 'en-US'
+  const intlLocale = locale === 'pt' ? 'pt-BR' : locale
 
   return (
     <div className="space-y-6">
@@ -183,7 +442,10 @@ function Forecast() {
       </div>
 
       <div className="card">
-        <h3 className="text-lg font-semibold mb-6">{t('reports.forecast.title')}</h3>
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold">{t('reports.forecast.title')}</h3>
+          <ExportButton headers={['Data', 'Saldo']} rows={(data?.dailyBalances || []).map((row) => [row.date, row.balance])} fileName="fluxo-de-caixa.csv" />
+        </div>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
@@ -201,7 +463,7 @@ function Forecast() {
               <Line
                 type="monotone"
                 dataKey="balance"
-                stroke="#3b82f6"
+                stroke="#12284d"
                 strokeWidth={2}
                 dot={false}
               />

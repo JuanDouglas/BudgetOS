@@ -43,6 +43,13 @@ function isExpired(expirationDate) {
   return val < currentYearMonth();
 }
 
+function getDebitDate(cycleEndDate, card) {
+  const cycleEnd = new Date(cycleEndDate);
+  if (card.debitDay) return setDate(addMonths(cycleEnd, 1), card.debitDay);
+  if (card.debitDaysBeforeEnd) return subDays(endOfMonth(addMonths(cycleEnd, 1)), card.debitDaysBeforeEnd);
+  return setDate(addMonths(cycleEnd, 1), 5);
+}
+
 /**
  * CreditCard model
  */
@@ -51,6 +58,8 @@ export class CreditCard {
    * Create a new credit card
    */
   static async create(userId, data) {
+    await Account.findByIdOrFail(data.accountId, userId);
+    if (data.linkedAccountId) await Account.findByIdOrFail(data.linkedAccountId, userId);
     const id = generateId();
 
     await knex('credit_cards').insert({
@@ -173,11 +182,13 @@ export class CreditCard {
 
       let cycleBalanceMap = {};
       let pendingAmountMap = {};
+      let currentCycleMap = {};
 
       if (deferredCardIds.length > 0) {
         const balances = await CreditCard.getBalancesForCards(deferredCardIds);
         cycleBalanceMap = balances.cycleBalances;
         pendingAmountMap = balances.pendingAmounts;
+        currentCycleMap = balances.currentCycles;
       }
 
       return cards.map(card => {
@@ -185,6 +196,7 @@ export class CreditCard {
         if (card.debit_type === 'deferred') {
           formatted.currentCycleBalance = cycleBalanceMap[card.id] || 0;
           formatted.pendingDebitAmount = pendingAmountMap[card.id] || 0;
+          formatted.currentCycle = currentCycleMap[card.id] || null;
         }
         return formatted;
       });
@@ -200,19 +212,63 @@ export class CreditCard {
   static async getBalancesForCards(cardIds) {
     if (!cardIds.length) return { cycleBalances: {}, pendingAmounts: {} };
 
-    // 1 query: sum of ABS(amount) for open cycles per card
+    const today = formatDateISO(new Date());
     const cycleRows = await knex('credit_card_cycles as ccc')
-      .join('transactions as t', 't.credit_card_cycle_id', 'ccc.id')
+      .leftJoin('transactions as t', function () {
+        this.on('t.credit_card_cycle_id', '=', 'ccc.id')
+          .andOnVal('t.status', '!=', 'void');
+      })
       .whereIn('ccc.credit_card_id', cardIds)
       .where('ccc.status', 'open')
-      .whereNot('t.status', 'void')
-      .groupBy('ccc.credit_card_id')
-      .select('ccc.credit_card_id')
-      .select(knex.raw('SUM(ABS(t.amount)) as balance'));
+      .groupBy(
+        'ccc.id', 'ccc.credit_card_id', 'ccc.cycle_start_date',
+        'ccc.cycle_end_date', 'ccc.debit_date', 'ccc.status',
+        'ccc.debit_transaction_id', 'ccc.created_at', 'ccc.updated_at'
+      )
+      .select('ccc.*')
+      .select(knex.raw('COALESCE(SUM(ABS(t.amount)), 0) as balance'));
 
     const cycleBalances = {};
+    const currentCycles = {};
     for (const row of cycleRows) {
-      cycleBalances[row.credit_card_id] = roundAmount(row.balance || 0);
+      cycleBalances[row.credit_card_id] = roundAmount((cycleBalances[row.credit_card_id] || 0) + Number(row.balance || 0));
+      const currentCycle = {
+        ...CreditCard.formatCycle(row),
+        totalAmount: roundAmount(row.balance || 0),
+        transactions: [],
+      };
+      const isCurrent = row.cycle_start_date <= today && row.cycle_end_date >= today;
+      const selectedCycle = currentCycles[row.credit_card_id];
+      const selectedIsCurrent = selectedCycle
+        && selectedCycle.cycleStartDate <= today
+        && selectedCycle.cycleEndDate >= today;
+      if (isCurrent || !selectedCycle || (!selectedIsCurrent && row.cycle_start_date > selectedCycle.cycleStartDate)) {
+        currentCycles[row.credit_card_id] = currentCycle;
+      }
+    }
+
+    const currentCycleIds = Object.values(currentCycles).map((cycle) => cycle.id);
+    if (currentCycleIds.length > 0) {
+      const transactions = await knex('transactions as t')
+        .leftJoin('categories as c', 't.category_id', 'c.id')
+        .whereIn('t.credit_card_cycle_id', currentCycleIds)
+        .whereNot('t.status', 'void')
+        .select('t.id', 't.credit_card_cycle_id', 't.amount', 't.description', 't.date', 't.purchase_date', 't.category_id', 't.status', 'c.name as category_name')
+        .orderBy('t.purchase_date', 'desc')
+        .orderBy('t.date', 'desc');
+      for (const transaction of transactions) {
+        const cycle = Object.values(currentCycles).find((item) => item.id === transaction.credit_card_cycle_id);
+        cycle.transactions.push({
+          id: transaction.id,
+          amount: Number(transaction.amount),
+          description: transaction.description,
+          date: transaction.date,
+          purchaseDate: transaction.purchase_date,
+          categoryId: transaction.category_id,
+          categoryName: transaction.category_name,
+          status: transaction.status,
+        });
+      }
     }
 
     // 1 query: sum of total_amount for pending cycles per card
@@ -228,14 +284,15 @@ export class CreditCard {
       pendingAmounts[row.credit_card_id] = roundAmount(row.total || 0);
     }
 
-    return { cycleBalances, pendingAmounts };
+    return { cycleBalances, pendingAmounts, currentCycles };
   }
 
   /**
    * Update a card
    */
   static async update(id, userId, data) {
-    await CreditCard.findByIdOrFail(id, userId);
+    const card = await CreditCard.findByIdOrFail(id, userId);
+    if (data.linkedAccountId) await Account.findByIdOrFail(data.linkedAccountId, userId);
 
     const allowedFields = [
       'linked_account_id', 'name', 'card_number_last4', 'expiration_date', 'debit_type',
@@ -249,6 +306,17 @@ export class CreditCard {
       await knex('credit_cards')
         .where({ id, user_id: userId })
         .update(updates);
+    }
+
+    if (data.debitDay !== undefined || data.debitDaysBeforeEnd !== undefined || data.cycleStartDay !== undefined) {
+      const updatedCard = { ...card, ...data };
+      const openCycles = await knex('credit_card_cycles')
+        .where({ credit_card_id: id, status: 'open' });
+      for (const cycle of openCycles) {
+        await knex('credit_card_cycles')
+          .where({ id: cycle.id })
+          .update({ debit_date: formatDateISO(getDebitDate(cycle.cycle_end_date, updatedCard)) });
+      }
     }
 
     return CreditCard.findById(id, userId);
@@ -333,10 +401,12 @@ export class CreditCard {
    */
   static async getCurrentCycle(cardId, userId) {
     await CreditCard.findByIdOrFail(cardId, userId);
+    const today = formatDateISO(new Date());
 
     const cycle = await knex('credit_card_cycles')
       .where({ credit_card_id: cardId, status: 'open' })
-      .orderBy('cycle_start_date', 'desc')
+      .where('cycle_start_date', '<=', today)
+      .where('cycle_end_date', '>=', today)
       .first();
 
     return cycle ? CreditCard.formatCycle(cycle) : null;
@@ -394,6 +464,7 @@ export class CreditCard {
   static async getCycleTotal(cycleId) {
     const result = await knex('transactions')
       .where('credit_card_cycle_id', cycleId)
+      .whereNot('status', 'void')
       .select(knex.raw('COALESCE(SUM(ABS(amount)), 0) as total'))
       .first();
 
@@ -464,53 +535,109 @@ export class CreditCard {
    * Assign a transaction to a cycle
    */
   static async assignTransactionToCycle(transactionId, cardId, userId) {
+    const result = await CreditCard.assignTransactionsToCycles([transactionId], cardId, userId);
+    return result[transactionId] || null;
+  }
+
+  static async assignTransactionsToCycles(transactionIds, cardId, userId) {
     const card = await CreditCard.findByIdOrFail(cardId, userId);
-    if (card.debitType !== 'deferred') return null;
-
-    const tx = await knex('transactions')
-      .where({ id: transactionId, user_id: userId })
-      .first();
-    if (!tx) return null;
-
-    const purchaseDate = tx.purchase_date || tx.date;
-    const cycle = getCycleForPurchase(purchaseDate, card.cycleStartDay);
-
-    // Find or create the cycle
-    let cycleRecord = await knex('credit_card_cycles')
-      .where({ credit_card_id: cardId, cycle_start_date: cycle.start })
-      .first();
-
-    if (!cycleRecord) {
-      // Calculate the debit date
-      const cycleEndDate = new Date(cycle.end);
-      let debitDate;
-      if (card.debitDay) {
-        debitDate = setDate(addMonths(cycleEndDate, 1), card.debitDay);
-      } else if (card.debitDaysBeforeEnd) {
-        debitDate = subDays(endOfMonth(addMonths(cycleEndDate, 1)), card.debitDaysBeforeEnd);
-      } else {
-        debitDate = setDate(addMonths(cycleEndDate, 1), 5);
-      }
-
-      const cycleId = await CreditCard.createCycle(cardId, userId, cycle.start, cycle.end, formatDateISO(debitDate));
-      cycleRecord = { id: cycleId };
+    const transactions = await knex('transactions')
+      .whereIn('id', transactionIds)
+      .andWhere('user_id', userId);
+    if (transactions.length !== transactionIds.length || transactions.some((tx) => tx.credit_card_id !== cardId)) {
+      throw new NotFoundError('Transaction does not belong to this card', 'CARD_TRANSACTION_MISMATCH');
     }
 
-    // Assign the transaction to the cycle
+    const oldCycleIds = new Set(transactions.map((tx) => tx.credit_card_cycle_id).filter(Boolean));
+    if (card.debitType !== 'deferred') {
+      await knex('transactions').whereIn('id', transactionIds).update({ credit_card_cycle_id: null, accounting_date: null });
+      for (const cycleId of oldCycleIds) await CreditCard.recalculateCycleTotal(cycleId);
+      return {};
+    }
+
+    const assignments = transactions.map((tx) => ({
+      tx,
+      cycle: getCycleForPurchase(tx.installment_group_id ? tx.date : (tx.purchase_date || tx.date), card.cycleStartDay),
+    }));
+    const cycleStarts = [...new Set(assignments.map(({ cycle }) => cycle.start))];
+    const existingCycles = await knex('credit_card_cycles')
+      .where('credit_card_id', cardId)
+      .whereIn('cycle_start_date', cycleStarts);
+    const cycleMap = new Map(existingCycles.map((cycle) => [cycle.cycle_start_date, cycle]));
+    const missingCycles = [];
+
+    for (const { cycle } of assignments) {
+      if (cycleMap.has(cycle.start)) continue;
+      const cycleId = generateId();
+      const debitDate = formatDateISO(getDebitDate(cycle.end, card));
+      const cycleRow = {
+        id: cycleId,
+        credit_card_id: cardId,
+        cycle_start_date: cycle.start,
+        cycle_end_date: cycle.end,
+        debit_date: debitDate,
+        status: 'open',
+      };
+      cycleMap.set(cycle.start, cycleRow);
+      missingCycles.push(cycleRow);
+    }
+
+    if (missingCycles.length > 0) await knex('credit_card_cycles').insert(missingCycles);
+
+    const assignedCycleIds = new Set();
+    const result = {};
+    const assignmentCases = [];
+    const accountingDateCases = [];
+    const cycleBindings = [];
+    const accountingDateBindings = [];
+    const assignedTransactionIds = [];
+    for (const { tx, cycle } of assignments) {
+      const cycleRecord = cycleMap.get(cycle.start);
+      assignedTransactionIds.push(tx.id);
+      assignmentCases.push('WHEN ? THEN ?');
+      accountingDateCases.push('WHEN ? THEN ?');
+      cycleBindings.push(tx.id, cycleRecord.id);
+      accountingDateBindings.push(tx.id, cycleRecord.cycle_end_date);
+      assignedCycleIds.add(cycleRecord.id);
+      result[tx.id] = cycleRecord.id;
+    }
+
+    const cycleCaseSql = `CASE id ${assignmentCases.join(' ')} ELSE credit_card_cycle_id END`;
+    const accountingDateCaseSql = `CASE id ${accountingDateCases.join(' ')} ELSE accounting_date END`;
     await knex('transactions')
-      .where({ id: transactionId })
+      .whereIn('id', assignedTransactionIds)
       .update({
-        credit_card_cycle_id: cycleRecord.id,
-        accounting_date: cycle.end,
+        credit_card_cycle_id: knex.raw(cycleCaseSql, cycleBindings),
+        accounting_date: knex.raw(accountingDateCaseSql, accountingDateBindings),
       });
 
-    // Update the cycle total
-    const total = await CreditCard.getCycleTotal(cycleRecord.id);
-    await knex('credit_card_cycles')
-      .where({ id: cycleRecord.id })
-      .update({ total_amount: total });
+    await CreditCard.recalculateCycleTotals([...new Set([...oldCycleIds, ...assignedCycleIds])]);
+    return result;
+  }
 
-    return cycleRecord.id;
+  static async recalculateCycleTotal(cycleId) {
+    return CreditCard.recalculateCycleTotals([cycleId]);
+  }
+
+  static async recalculateCycleTotals(cycleIds) {
+    if (cycleIds.length === 0) return;
+    const rows = await knex('transactions')
+      .whereIn('credit_card_cycle_id', cycleIds)
+      .whereNot('status', 'void')
+      .groupBy('credit_card_cycle_id')
+      .select('credit_card_cycle_id')
+      .sum({ total: knex.raw('ABS(amount)') });
+    const totals = new Map(rows.map((row) => [row.credit_card_cycle_id, roundAmount(row.total || 0)]));
+    const bindings = [];
+    const cases = [];
+    for (const cycleId of cycleIds) {
+      cases.push('WHEN ? THEN ?');
+      bindings.push(cycleId, totals.get(cycleId) || 0);
+    }
+    await knex('credit_card_cycles')
+      .whereIn('id', cycleIds)
+      .whereNot('status', 'debited')
+      .update({ total_amount: knex.raw(`CASE id ${cases.join(' ')} ELSE total_amount END`, bindings) });
   }
 
   /**

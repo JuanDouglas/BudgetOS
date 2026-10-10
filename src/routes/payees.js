@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { resolveWorkspaceContext } from '../middleware/workspaceContext.js';
 import {
   getPayees,
   getPayee,
@@ -13,6 +14,7 @@ import {
 const router = Router();
 
 router.use(requireAuth);
+router.use(resolveWorkspaceContext);
 
 router.get('/', getPayees);
 router.get('/:id', getPayee);

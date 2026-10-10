@@ -53,6 +53,22 @@ describe('Credit Cards - CRUD', () => {
     expect(res.body.data.creditCard.name).toBe('Visa Gold')
   })
 
+  it('should reject a card account owned by another user', async () => {
+    const otherUser = await createAuthenticatedAgent(app)
+    const otherAccountResponse = await otherUser.agent
+      .post('/api/v1/accounts')
+      .set('X-CSRF-Token', otherUser.csrfToken)
+      .send({ name: 'Private account', type: 'checking' })
+    const response = await agent
+      .post('/api/v1/credit-cards')
+      .set('X-CSRF-Token', csrfToken)
+      .send(makeCard({ accountId: otherAccountResponse.body.data.account.id }))
+
+    expect(otherAccountResponse.status).toBe(201)
+    expect(response.status).toBe(404)
+    expect(response.body.error.code).toBe('ACCOUNT_NOT_FOUND')
+  })
+
   it('should list credit cards', async () => {
     await agent.post('/api/v1/credit-cards').set('X-CSRF-Token', csrfToken).send(makeCard())
 

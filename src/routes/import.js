@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import * as importController from '../controllers/importController.js';
 import { requireAuth } from '../middleware/auth.js';
+import { resolveWorkspaceContext } from '../middleware/workspaceContext.js';
 import { uploadRateLimiter } from '../middleware/security.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import config from '../config/index.js';
@@ -31,6 +32,7 @@ const upload = multer({
 });
 
 router.use(requireAuth);
+router.use(resolveWorkspaceContext);
 
 // New unified routes: analyze (upload + parse + match) and confirm
 router.post('/analyze', uploadRateLimiter, upload.single('file'), asyncHandler(importController.analyzeImport));

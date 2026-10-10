@@ -3,7 +3,7 @@
  * Provides CRUD operations for credit cards with filtering and sorting
  */
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { creditCardsApi, accountsApi } from '../lib/api'
@@ -22,13 +22,16 @@ import ConfirmModal from '../components/ConfirmModal'
  * @param {Function} props.onClose - Callback when modal is closed
  * @param {Function} props.onSave - Callback with form data when saved
  */
-function CreditCardModal({ card, accounts, onClose, onSave }) {
+function CreditCardModal({ card, accounts, accountsLoading, onClose, onSave }) {
   const { t } = useTranslation()
-  const checkingAccounts = accounts?.filter(a => a.type === 'checking') || []
+  const eligibleAccounts = useMemo(
+    () => accounts?.filter((account) => account.type !== 'credit_card' || account.id === card?.accountId) || [],
+    [accounts, card?.accountId]
+  )
 
   const [formData, setFormData] = useState({
     name: card?.name || '',
-    accountId: card?.accountId || checkingAccounts[0]?.id || '',
+    accountId: card?.accountId || eligibleAccounts[0]?.id || '',
     linkedAccountId: card?.linkedAccountId || '',
     cardNumberLast4: card?.cardNumberLast4 || '',
     expirationDate: card?.expirationDate || '',
@@ -38,6 +41,12 @@ function CreditCardModal({ card, accounts, onClose, onSave }) {
     creditLimit: card?.creditLimit ? String(card.creditLimit) : '',
     color: card?.color || '#EF4444',
   })
+
+  useEffect(() => {
+    if (!formData.accountId && eligibleAccounts.length > 0) {
+      setFormData((current) => ({ ...current, accountId: eligibleAccounts[0].id }))
+    }
+  }, [eligibleAccounts, formData.accountId])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -87,9 +96,14 @@ function CreditCardModal({ card, accounts, onClose, onSave }) {
               onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}
               className="input"
               required
+              disabled={accountsLoading || eligibleAccounts.length === 0}
             >
-              <option value="">{t('creditCards.selectAccount')}</option>
-              {checkingAccounts.map((a) => (
+              {accountsLoading
+                ? <option value="">{t('common.loading')}</option>
+                : eligibleAccounts.length === 0
+                  ? <option value="">{t('creditCards.noAccountsAvailable', { defaultValue: 'Nenhuma conta disponível' })}</option>
+                  : <option value="">{t('creditCards.selectAccount')}</option>}
+              {eligibleAccounts.map((a) => (
                 <option key={a.id} value={a.id}>{a.name}</option>
               ))}
             </select>
@@ -205,7 +219,7 @@ function CreditCardModal({ card, accounts, onClose, onSave }) {
             <button type="button" onClick={onClose} className="btn btn-secondary flex-1">
               {t('common.cancel')}
             </button>
-            <button type="submit" className="btn btn-primary flex-1">
+            <button type="submit" disabled={!formData.accountId || accountsLoading || eligibleAccounts.length === 0} className="btn btn-primary flex-1 disabled:opacity-60">
               {card ? t('common.edit') : t('common.create')}
             </button>
           </div>
@@ -243,7 +257,7 @@ export default function CreditCards() {
     setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
   }
 
-  const { data: accountsData } = useQuery({
+  const { data: accountsData, isLoading: accountsLoading } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => accountsApi.getAll().then(r => r.data),
   })
@@ -252,6 +266,7 @@ export default function CreditCards() {
     mutationFn: creditCardsApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-card-cycle'] })
       setModalOpen(false)
     },
     onError: (err) => alert(translateError(err)),
@@ -261,6 +276,7 @@ export default function CreditCards() {
     mutationFn: ({ id, data }) => creditCardsApi.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['credit-cards'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-card-cycle'] })
       setEditingCard(null)
     },
     onError: (err) => alert(translateError(err)),
@@ -399,6 +415,7 @@ export default function CreditCards() {
         <CreditCardModal
           card={editingCard}
           accounts={accountsData?.data}
+          accountsLoading={accountsLoading}
           onClose={() => { setModalOpen(false); setEditingCard(null) }}
           onSave={handleSave}
         />
@@ -434,15 +451,7 @@ export default function CreditCards() {
 function CardDetail({ card, onEdit, onDelete }) {
   const { t } = useTranslation()
   const { formatCurrency, formatDate } = useFormatters()
-
-  // Fetch current billing cycle for deferred debit cards
-  const { data: cycleData } = useQuery({
-    queryKey: ['credit-card-cycle', card.id],
-    queryFn: () => creditCardsApi.getCurrentCycle(card.id).then(r => r.data.data),
-    enabled: card.debitType === 'deferred',
-  })
-
-  const cycle = cycleData?.cycle
+  const cycle = card.currentCycle
 
   /**
    * Checks if the card is expired based on MM/YY format
@@ -541,19 +550,20 @@ function CardDetail({ card, onEdit, onDelete }) {
             <span className="font-semibold">{formatCurrency(cycle.totalAmount || 0)}</span>
           </div>
 
-          {cycleData?.cycle?.transactions?.length > 0 && (
-            <div className="mt-4 pt-4 border-t">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">{t('creditCards.recentOperations')}</h4>
+          {cycle.transactions?.length > 0 && (
+            <div className="mt-4 border-t pt-4">
+              <h4 className="mb-3 text-sm font-medium text-gray-700">{t('creditCards.recentOperations')}</h4>
               <div className="space-y-2">
-                {cycleData.cycle.transactions.slice(0, 5).map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600 truncate flex-1">{tx.description}</span>
-                    <span className="font-medium ml-2">{formatCurrency(Math.abs(tx.amount))}</span>
+                {cycle.transactions.slice(0, 5).map((transaction) => (
+                  <div key={transaction.id} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="truncate text-gray-600">{transaction.description}</span>
+                    <span className="shrink-0 font-medium">{formatCurrency(Math.abs(transaction.amount))}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
+
         </>
       )}
 

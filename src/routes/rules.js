@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as ruleController from '../controllers/ruleController.js';
 import { requireAuth } from '../middleware/auth.js';
+import { resolveWorkspaceContext } from '../middleware/workspaceContext.js';
 import { validate } from '../middleware/validation.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { createRuleSchema, updateRuleSchema, ruleIdParamSchema, listRulesQuerySchema, testRuleSchema } from '../validators/rules.js';
@@ -8,6 +9,7 @@ import { createRuleSchema, updateRuleSchema, ruleIdParamSchema, listRulesQuerySc
 const router = Router();
 
 router.use(requireAuth);
+router.use(resolveWorkspaceContext);
 
 router.post('/', validate({ body: createRuleSchema }), asyncHandler(ruleController.createRule));
 router.get('/', validate({ query: listRulesQuerySchema }), asyncHandler(ruleController.getRules));

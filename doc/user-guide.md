@@ -58,6 +58,10 @@ The sidebar on the left provides access to all sections:
 
 Users with **Admin** or **Super Admin** roles also see an **Administration** section with Users, Groups, and System settings.
 
+### Client Workspaces
+
+Use the client selector in the top bar to switch between the personal workspace and client workspaces. Select **Add client** to create an isolated workspace with its own transactions, accounts, reports, currency, and number formatting. New workspaces default to Brazilian Portuguese and BRL. Client workspaces are available only to the BPO user who created them.
+
 ---
 
 ## 2. Dashboard
@@ -414,6 +418,18 @@ When deleting a payee, you can reassign all their transactions to a different pa
 ## 12. Reports
 
 Analyze your finances with interactive charts and reports.
+
+### Management Income Statement
+
+Shows current-month income, expenses, and net result, broken down by category. The report uses the workspace's currency and Brazilian number format when configured for BRL/Portuguese.
+
+### Payables and Receivables
+
+Lists pending transactions and scheduled occurrences expected over the next 90 days, separated into payments and receipts.
+
+### Reconciliation Queue
+
+Lists non-void transactions for the current month that are not marked as reconciled.
 
 ### Trend Report
 
