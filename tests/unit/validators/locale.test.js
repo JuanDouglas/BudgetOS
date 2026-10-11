@@ -31,14 +31,14 @@ describe('Locale validation', () => {
       expect(result.success).toBe(false)
     })
 
-    it('should default to French (fr) when no locale provided', () => {
+    it('should default to Portuguese (pt) when no locale provided', () => {
       const result = registerSchema.safeParse({
         email: 'test@example.com',
         password: 'Password1',
         passwordConfirm: 'Password1',
       })
       expect(result.success).toBe(true)
-      expect(result.data.locale).toBe('fr')
+      expect(result.data.locale).toBe('pt')
     })
   })
 

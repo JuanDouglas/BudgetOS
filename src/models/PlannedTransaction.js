@@ -117,7 +117,7 @@ export class PlannedTransaction {
 
     // Pair existing transactions with expected dates by position
     for (let i = 0; i < pairCount; i++) {
-      const existingDate = formatDateISO(new Date(existingTxs[i].date));
+      const existingDate = formatDateISO(existingTxs[i].date);
       if (existingDate !== expectedDates[i]) {
         // Update the transaction date to match the expected date
         await knex('transactions')

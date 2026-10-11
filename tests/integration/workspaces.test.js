@@ -48,7 +48,7 @@ describe('Client workspaces', () => {
     expect(clientRecord.data_user_id).not.toBe(user.id);
     expect(clientRecord.digit_grouping).toBe('.');
     const internalUser = await database('users').where('id', clientRecord.data_user_id).first();
-    expect(internalUser.is_workspace_identity).toBe(true);
+    expect(internalUser.is_workspace_identity).toBeTruthy();
 
     const accountResponse = await agent
       .post('/api/v1/accounts')

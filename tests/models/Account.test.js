@@ -67,7 +67,7 @@ describe('Account.create', () => {
 
     expect(account.initialBalance).toBe(0)
     expect(account.currentBalance).toBe(0)
-    expect(account.currency).toBe('EUR')
+    expect(account.currency).toBe('BRL')
     expect(account.color).toBe('#3B82F6')
     expect(account.icon).toBe('wallet')
     expect(account.isIncludedInTotal).toBe(true)

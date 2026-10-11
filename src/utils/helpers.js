@@ -1,5 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
-import { format, addDays, addMonths, differenceInDays, endOfMonth, setDate, subDays } from 'date-fns';
+import { format, parseISO, addDays, addMonths, differenceInDays, endOfMonth, setDate, subDays } from 'date-fns';
+
+const parseDate = (date) => typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+  ? parseISO(date)
+  : new Date(date);
 
 /**
  * Generate a UUID v4
@@ -27,14 +31,14 @@ export const roundAmount = (amount) => {
  * Format a date to ISO
  */
 export const formatDateISO = (date) => {
-  return format(new Date(date), 'yyyy-MM-dd');
+  return format(parseDate(date), 'yyyy-MM-dd');
 };
 
 /**
  * Format a date in French format
  */
 export const formatDateFR = (date) => {
-  return format(new Date(date), 'dd/MM/yyyy');
+  return format(parseDate(date), 'dd/MM/yyyy');
 };
 
 /**

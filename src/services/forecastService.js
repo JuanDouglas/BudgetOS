@@ -1,6 +1,6 @@
 import knex from '../database/connection.js';
 import { roundAmount, formatDateISO } from '../utils/helpers.js';
-import { addDays, addMonths, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { parseISO, addDays, addMonths, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import dateHelpers from '../database/dateHelpers.js';
 import Account from '../models/Account.js';
 import { advanceByFrequency } from '../utils/dateFrequency.js';
@@ -116,8 +116,8 @@ export class ForecastService {
 
   static generateOccurrences(planned, start, end) {
     const occurrences = [];
-    let current = new Date(planned.next_occurrence || planned.start_date);
-    const endDate = planned.end_date ? new Date(planned.end_date) : end;
+    let current = parseISO(planned.next_occurrence || planned.start_date);
+    const endDate = planned.end_date ? parseISO(planned.end_date) : end;
     const maxDate = new Date(Math.min(end.getTime(), endDate.getTime()));
 
     // Compare on the calendar date, not the timestamp: `start` carries the
@@ -335,8 +335,8 @@ export class ForecastService {
 
     const plannedTxs = await ptQuery;
 
-    const startD = new Date(startDate);
-    const endD = new Date(endDate);
+    const startD = parseISO(startDate);
+    const endD = parseISO(endDate);
     const projectedTxs = [];
 
     for (const pt of plannedTxs) {

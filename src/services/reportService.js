@@ -1,7 +1,7 @@
 import knex from '../database/connection.js';
 import dateHelpers from '../database/dateHelpers.js';
 import { roundAmount, formatDateISO } from '../utils/helpers.js';
-import { startOfMonth, endOfMonth, subMonths, format, eachMonthOfInterval, startOfYear, addDays, isBefore, isAfter, isEqual } from 'date-fns';
+import { parseISO, startOfMonth, endOfMonth, subMonths, format, eachMonthOfInterval, startOfYear, addDays, isBefore, isAfter, isEqual } from 'date-fns';
 import { advanceByFrequency } from '../utils/dateFrequency.js';
 
 export class ReportService {
@@ -254,8 +254,8 @@ export class ReportService {
     // Helper: generate all occurrences of a planned transaction between start and end dates
     const getOccurrences = (pt, startDate, endDate) => {
       const occurrences = [];
-      let current = new Date(pt.next_occurrence);
-      const ptEndDate = pt.end_date ? new Date(pt.end_date) : null;
+      let current = parseISO(pt.next_occurrence);
+      const ptEndDate = pt.end_date ? parseISO(pt.end_date) : null;
       let safety = 0;
 
       while ((isBefore(current, endDate) || isEqual(current, endDate)) && safety < 100) {

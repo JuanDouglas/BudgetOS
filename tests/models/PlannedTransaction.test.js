@@ -81,7 +81,7 @@ describe('PlannedTransaction.calculateNextOccurrence', () => {
     })
 
     expect(result).not.toBeNull()
-    const nextDate = new Date(result)
+    const nextDate = new Date(`${result}T00:00:00`)
     const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0)
     expect(nextDate >= todayMidnight).toBe(true)
   })
@@ -103,7 +103,7 @@ describe('PlannedTransaction.calculateNextOccurrence', () => {
     })
 
     expect(result).not.toBeNull()
-    const nextDate = new Date(result)
+    const nextDate = new Date(`${result}T00:00:00`)
     const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0)
     expect(nextDate >= todayMidnight).toBe(true)
     // Should be a Wednesday (2020-01-01 was Wednesday)
@@ -119,7 +119,7 @@ describe('PlannedTransaction.calculateNextOccurrence', () => {
     })
 
     expect(result).not.toBeNull()
-    const nextDate = new Date(result)
+    const nextDate = new Date(`${result}T00:00:00`)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     expect(nextDate >= today).toBe(true)
