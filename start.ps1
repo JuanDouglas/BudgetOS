@@ -3,7 +3,8 @@ $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $client = Join-Path $root 'client'
 $siteUrl = 'http://localhost:5173'
-$npm = (Get-Command npm.cmd -ErrorAction Stop).Source
+$npm = (Get-Command npm -ErrorAction Stop).Source
+$powerShell = (Get-Process -Id $PID).Path
 
 function Install-Dependencies([string]$directory) {
 	if (Test-Path (Join-Path $directory 'node_modules')) {
@@ -24,17 +25,19 @@ function Install-Dependencies([string]$directory) {
 }
 
 function Test-Port([int]$port) {
-	$connection = [System.Net.Sockets.TcpClient]::new()
-	try {
-		$connection.Connect('localhost', $port)
-		return $true
+	foreach ($address in [System.Net.Dns]::GetHostAddresses('localhost')) {
+		$connection = [System.Net.Sockets.TcpClient]::new($address.AddressFamily)
+		try {
+			$connection.Connect($address, $port)
+			return $true
+		}
+		catch {
+		}
+		finally {
+			$connection.Dispose()
+		}
 	}
-	catch {
-		return $false
-	}
-	finally {
-		$connection.Dispose()
-	}
+	return $false
 }
 
 function Wait-ForPort([int]$port, [int]$timeoutSeconds = 60) {
@@ -62,13 +65,13 @@ Install-Dependencies $root
 Install-Dependencies $client
 
 Write-Host 'Starting backend at http://localhost:3000...'
-Start-Process -FilePath $env:ComSpec `
-	-ArgumentList @('/k', 'npm.cmd run dev') `
+Start-Process -FilePath $powerShell `
+	-ArgumentList @('-NoExit', '-Command', 'npm run dev') `
 	-WorkingDirectory $root
 
 Write-Host 'Starting frontend at http://localhost:5173...'
-Start-Process -FilePath $env:ComSpec `
-	-ArgumentList @('/k', 'npm.cmd run dev -- --strictPort') `
+Start-Process -FilePath $powerShell `
+	-ArgumentList @('-NoExit', '-Command', 'npm run dev -- --strictPort') `
 	-WorkingDirectory $client
 
 if (-not (Wait-ForPort 3000)) {
