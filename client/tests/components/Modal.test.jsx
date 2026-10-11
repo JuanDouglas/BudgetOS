@@ -23,6 +23,23 @@ function ModalHarness() {
   )
 }
 
+function NestedModalHarness() {
+  const [outerOpen, setOuterOpen] = useState(false)
+  const [innerOpen, setInnerOpen] = useState(false)
+
+  return (
+    <>
+      <button type="button" onClick={() => setOuterOpen(true)}>Open outer</button>
+      {outerOpen && (
+        <Modal onClose={() => setOuterOpen(false)}>
+          <button type="button" onClick={() => setInnerOpen(true)}>Open inner</button>
+          {innerOpen && <Modal onClose={() => setInnerOpen(false)}><button type="button">Inner action</button></Modal>}
+        </Modal>
+      )}
+    </>
+  )
+}
+
 describe('Modal keyboard flow', () => {
   it('moves focus into the modal and traps Tab at the end', () => {
     render(<ModalHarness />)
@@ -30,6 +47,7 @@ describe('Modal keyboard flow', () => {
 
     const firstAction = screen.getByRole('button', { name: 'First action' })
     const lastAction = screen.getByRole('button', { name: 'Last action' })
+    expect(firstAction.parentElement.parentElement).toBe(document.body)
     expect(firstAction).toHaveFocus()
 
     lastAction.focus()
@@ -46,5 +64,15 @@ describe('Modal keyboard flow', () => {
 
     expect(screen.queryByRole('button', { name: 'First action' })).not.toBeInTheDocument()
     expect(opener).toHaveFocus()
+  })
+
+  it('closes only the top modal when dialogs are nested', () => {
+    render(<NestedModalHarness />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open outer' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open inner' }))
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('button', { name: 'Inner action' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open inner' })).toBeInTheDocument()
   })
 })

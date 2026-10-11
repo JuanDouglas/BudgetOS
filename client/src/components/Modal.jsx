@@ -5,7 +5,11 @@
  */
 
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { cn } from '../lib/utils'
+
+const modalStack = []
 
 /**
  * Modal component with overlay backdrop
@@ -20,6 +24,7 @@ import { useAuth } from '../contexts/AuthContext'
 export default function Modal({ children, onClose, className = '' }) {
   const overlayRef = useRef(null)
   const returnFocusRef = useRef(null)
+  const modalId = useRef(Symbol('modal'))
   const { userSettings } = useAuth()
   const persistent = userSettings?.modalPersistent ?? false
 
@@ -35,7 +40,17 @@ export default function Modal({ children, onClose, className = '' }) {
   }, [])
 
   useEffect(() => {
+    const modalInstanceId = modalId.current
+    modalStack.push(modalInstanceId)
+    return () => {
+      const index = modalStack.lastIndexOf(modalInstanceId)
+      if (index !== -1) modalStack.splice(index, 1)
+    }
+  }, [])
+
+  useEffect(() => {
     const handleKeyDown = (event) => {
+      if (modalStack[modalStack.length - 1] !== modalId.current) return
       if (event.key === 'Escape') {
         event.preventDefault()
         onClose()
@@ -77,15 +92,16 @@ export default function Modal({ children, onClose, className = '' }) {
     }
   }
 
-  return (
+  return createPortal(
     <div
       ref={overlayRef}
       tabIndex={-1}
       onClick={handleOverlayClick}
-      className={`fixed inset-0 overscroll-contain bg-black/50 flex items-center justify-center z-50 p-4 ${className}`}
+      className={cn('fixed inset-0 overscroll-contain bg-black/50 flex items-center justify-center z-50 p-4', className)}
     >
       {children}
-    </div>
+    </div>,
+    document.body
   )
 }
 

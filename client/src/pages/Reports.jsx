@@ -694,12 +694,13 @@ function Forecast() {
           <h3 className="text-lg font-semibold">{t('reports.forecast.dailySchedule', { defaultValue: 'Movimentação diária e saldo consolidado' })}</h3>
           <p className="text-sm text-gray-500">{t('reports.forecast.detailHint', { defaultValue: 'Expanda um dia para consultar cada lançamento e sua origem.' })}</p>
         </div>
-        <table className="w-full min-w-[780px] text-sm">
+        <table className="w-full min-w-[920px] text-sm">
           <thead className="border-b text-left text-gray-500">
             <tr>
               <th className="py-2 font-medium">{t('common.date')}</th>
               <th className="py-2 font-medium">{t('reports.forecast.details', { defaultValue: 'Detalhes' })}</th>
               <th className="py-2 text-right font-medium">{t('reports.forecast.actualIncome', { defaultValue: 'Realizado +' })}</th>
+              <th className="py-2 text-right font-medium">{t('reports.forecast.actualExpenses', { defaultValue: 'Realizado -' })}</th>
               <th className="py-2 text-right font-medium">{t('reports.forecast.projectedIncome', { defaultValue: 'Previsto +' })}</th>
               <th className="py-2 text-right font-medium">{t('reports.forecast.projectedExpenses', { defaultValue: 'Previsto -' })}</th>
               <th className="py-2 text-right font-medium">{t('reports.forecast.projectedBalance', { defaultValue: 'Saldo projetado' })}</th>
@@ -730,12 +731,13 @@ function Forecast() {
                   ) : <span className="text-gray-400">{t('reports.forecast.noMovement', { defaultValue: 'Sem movimentação' })}</span>}
                 </td>
                 <td className="whitespace-nowrap py-3 text-right tabular-nums">{formatCurrency(row.actualIncome)}</td>
+                <td className="whitespace-nowrap py-3 text-right tabular-nums text-red-700">{formatCurrency(row.actualExpenses)}</td>
                 <td className="whitespace-nowrap py-3 text-right tabular-nums text-green-700">{formatCurrency(row.projectedIncome)}</td>
                 <td className="whitespace-nowrap py-3 text-right tabular-nums text-red-700">{formatCurrency(row.projectedExpenses)}</td>
                 <td className="whitespace-nowrap py-3 text-right font-semibold tabular-nums">{formatCurrency(row.balance)}</td>
               </tr>
             ))}
-            {dailyRows.length === 0 && <EmptyRow colSpan={6} label={t('common.noData')} />}
+            {dailyRows.length === 0 && <EmptyRow colSpan={7} label={t('common.noData')} />}
           </tbody>
         </table>
       </div>

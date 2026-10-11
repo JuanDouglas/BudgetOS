@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render as renderComponent, screen, fireEvent } from '@testing-library/react'
 
 // Mock i18n: return the key with interpolation replaced
 vi.mock('react-i18next', () => ({
@@ -83,6 +83,11 @@ vi.mock('../../src/contexts/AuthContext', () => ({
 }))
 
 import { TransactionModal } from '../../src/pages/Transactions'
+
+function render(ui) {
+  const result = renderComponent(ui)
+  return { ...result, container: document.body }
+}
 
 const mockAccounts = [
   { id: 'acc-checking', name: 'Compte Courant', type: 'checking' },

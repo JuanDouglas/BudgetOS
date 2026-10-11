@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { createTestApp, createAuthenticatedAgent, seedSystemSettings } from './helpers.js'
+import { createTestApp, createAuthenticatedAgent, getTestDb, seedSystemSettings } from './helpers.js'
 
 // Use dates in next month so projected occurrences (computed from
 // startDate >= today) fall inside the test window regardless of when
@@ -25,6 +25,7 @@ describe('Forecast Transactions API', () => {
     const auth = await createAuthenticatedAgent(app)
     agent = auth.agent
     csrfToken = auth.csrfToken
+    const database = getTestDb()
 
     // Create two accounts
     const res1 = await agent.post('/api/v1/accounts')
@@ -36,6 +37,25 @@ describe('Forecast Transactions API', () => {
       .set('X-CSRF-Token', csrfToken)
       .send({ name: 'Savings', type: 'savings', initialBalance: 10000 })
     account2Id = res2.body.data.account.id
+
+    await database('credit_cards').insert({
+      id: 'forecast-deferred-card',
+      user_id: auth.user.id,
+      account_id: accountId,
+      linked_account_id: accountId,
+      name: 'Corporate Visa',
+      debit_type: 'deferred',
+      is_active: true,
+    })
+    await database('credit_card_cycles').insert({
+      id: 'forecast-deferred-cycle',
+      credit_card_id: 'forecast-deferred-card',
+      cycle_start_date: periodStart,
+      cycle_end_date: periodEnd,
+      debit_date: periodStart,
+      total_amount: 735.25,
+      status: 'pending',
+    })
 
     // Create an actual transaction in the period
     await agent.post('/api/v1/transactions')
@@ -70,6 +90,21 @@ describe('Forecast Transactions API', () => {
     const sources = new Set(res.body.data.data.map(tx => tx.source))
     expect(sources.has('actual')).toBe(true)
     expect(sources.has('projected')).toBe(true)
+  })
+
+  it('includes deferred card debits in projected cash flow', async () => {
+    const res = await agent.get('/api/v1/reports/forecast/transactions')
+      .query({ startDate: periodStart, endDate: periodEnd })
+
+    const cardDebit = res.body.data.data.find((tx) => tx.sourceType === 'card_debit')
+    expect(cardDebit).toMatchObject({
+      date: periodStart,
+      amount: -735.25,
+      description: 'Fatura de cartão: Corporate Visa',
+      type: 'expense',
+      source: 'projected',
+      accountId,
+    })
   })
 
   it('should filter by accountId', async () => {

@@ -804,7 +804,7 @@ export default function PlannedTransactions() {
             onCreateCategory={handleCreateCategory}
           />
         ) : (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Modal onClose={() => setModalOpen(false)}>
             <div className="bg-white rounded-xl p-8 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
               <p className="text-gray-600">{t('planned.loadingData')}</p>
@@ -815,7 +815,7 @@ export default function PlannedTransactions() {
                 {t('common.cancel')}
               </button>
             </div>
-          </div>
+          </Modal>
         )
       )}
 

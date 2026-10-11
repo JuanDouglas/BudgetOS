@@ -375,6 +375,45 @@ export class ForecastService {
       }
     }
 
+    if ((!type || type === 'expense') && isReconciled !== 'true' && !categoryId) {
+      let cycleQuery = knex('credit_card_cycles as ccc')
+        .join('credit_cards as cc', 'ccc.credit_card_id', 'cc.id')
+        .leftJoin('accounts as a', 'cc.linked_account_id', 'a.id')
+        .select('ccc.id', 'ccc.debit_date', 'ccc.total_amount', 'cc.name as card_name', 'cc.linked_account_id', 'a.name as account_name', 'a.color as account_color')
+        .where('cc.user_id', userId)
+        .whereIn('ccc.status', ['open', 'pending'])
+        .where('ccc.total_amount', '>', 0)
+        .whereBetween('ccc.debit_date', [startDate, endDate])
+        .whereNotNull('cc.linked_account_id');
+
+      if (accountId) cycleQuery = cycleQuery.where('cc.linked_account_id', accountId);
+
+      const cycles = await cycleQuery;
+      for (const cycle of cycles) {
+        const description = `Fatura de cartão: ${cycle.card_name}`;
+        if (search && !description.toLowerCase().includes(search.toLowerCase())
+            && !cycle.card_name.toLowerCase().includes(search.toLowerCase())) continue;
+
+        projectedTxs.push({
+          id: `projected-card-cycle-${cycle.id}`,
+          date: cycle.debit_date,
+          amount: -Number(cycle.total_amount),
+          description,
+          type: 'expense',
+          status: 'projected',
+          isReconciled: false,
+          accountId: cycle.linked_account_id,
+          accountName: cycle.account_name,
+          accountColor: cycle.account_color,
+          categoryId: null,
+          categoryName: 'Fatura de cartão',
+          payeeName: cycle.card_name,
+          source: 'projected',
+          sourceType: 'card_debit',
+        });
+      }
+    }
+
     // 3. Merge and sort by date ASC
     const merged = [...formattedActual, ...projectedTxs]
       .sort((a, b) => a.date.localeCompare(b.date));
