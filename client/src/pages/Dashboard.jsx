@@ -6,7 +6,7 @@ import { reportsApi, accountsApi } from '../lib/api'
 import { useFormatters } from '../hooks/useFormatters'
 import {
   Wallet, TrendingUp, TrendingDown, ArrowUpRight,
-  ArrowDownRight, Clock, PieChart, ExternalLink
+  ArrowDownRight, Clock, PieChart, ExternalLink, Plus, Upload, Scale, FileText, CalendarClock
 } from 'lucide-react'
 import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
@@ -81,7 +81,7 @@ export default function Dashboard() {
     queryFn: () => reportsApi.getDashboard().then(r => r.data.data),
   })
 
-  const { data: accounts } = useQuery({
+  const { data: accounts, isLoading: accountsLoading, error: accountsError } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => accountsApi.getAll().then(r => r.data),
   })
@@ -124,6 +124,36 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold text-gray-900">{t('dashboard.title')}</h1>
         <p className="text-gray-600">{t('dashboard.subtitle')}</p>
       </div>
+
+      <section aria-labelledby="dashboard-actions-title" className="space-y-3">
+        <h2 id="dashboard-actions-title" className="text-sm font-semibold text-gray-700">{t('common.actions')}</h2>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+          <Link to="/transactions?new=expense" className="flex min-h-14 items-center gap-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
+            <Plus className="h-4 w-4 shrink-0" />
+            <span>{t('dashboard.quickActions.newExpense', { defaultValue: 'Nova despesa' })}</span>
+          </Link>
+          <Link to="/transactions?new=income" className="flex min-h-14 items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800 transition-colors hover:bg-green-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-2">
+            <TrendingUp className="h-4 w-4 shrink-0" />
+            <span>{t('dashboard.quickActions.newIncome', { defaultValue: 'Nova receita' })}</span>
+          </Link>
+          <Link to="/import" className="flex min-h-14 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
+            <Upload className="h-4 w-4 shrink-0" />
+            <span>{t('import.title')}</span>
+          </Link>
+          <Link to="/transactions?reconcile=1" className="flex min-h-14 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
+            <Scale className="h-4 w-4 shrink-0" />
+            <span>{t('transactions.reconciliation.title')}</span>
+          </Link>
+          <Link to="/reports?tab=payables" className="flex min-h-14 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
+            <CalendarClock className="h-4 w-4 shrink-0" />
+            <span>{t('reports.forecast.bpo.payables', { defaultValue: 'A pagar/receber' })}</span>
+          </Link>
+          <Link to="/reports" className="flex min-h-14 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
+            <FileText className="h-4 w-4 shrink-0" />
+            <span>{t('reports.title')}</span>
+          </Link>
+        </div>
+      </section>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -176,8 +206,13 @@ export default function Dashboard() {
               <ExternalLink className="w-3.5 h-3.5" />
             </Link>
           </div>
-          <div className="space-y-3">
-            {accounts?.data?.map((account) => (
+          {accountsLoading ? (
+            <p className="py-4 text-sm text-gray-500">{t('common.loading')}</p>
+          ) : accountsError ? (
+            <p role="alert" className="py-4 text-sm text-red-600">{t('common.error')}</p>
+          ) : accounts?.data?.length ? (
+            <div className="space-y-3">
+              {accounts.data.map((account) => (
               <Link
                 key={account.id}
                 to={`/transactions?account=${account.id}`}
@@ -208,8 +243,17 @@ export default function Dashboard() {
                   })()}
                 </div>
               </Link>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md bg-gray-50 px-4 py-5 text-center">
+              <p className="mb-3 text-sm text-gray-600">{t('common.noData')}</p>
+              <Link to="/accounts" className="inline-flex items-center gap-2 text-sm font-medium text-primary-700 hover:text-primary-800">
+                <Plus className="h-4 w-4" />
+                {t('accounts.newAccount')}
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Expenses by category */}

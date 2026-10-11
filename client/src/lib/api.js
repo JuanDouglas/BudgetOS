@@ -121,6 +121,9 @@ export const workspaceApi = {
   getAll: () => api.get('/workspaces'),
   create: (data) => api.post('/workspaces', data),
   activate: (workspaceId) => api.post(`/workspaces/${workspaceId}/activate`),
+  deactivate: (workspaceId) => api.post(`/workspaces/${workspaceId}/deactivate`),
+  reactivate: (workspaceId) => api.post(`/workspaces/${workspaceId}/reactivate`),
+  delete: (workspaceId) => api.delete(`/workspaces/${workspaceId}`),
 }
 
 /**

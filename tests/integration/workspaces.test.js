@@ -105,4 +105,56 @@ describe('Client workspaces', () => {
       .send({ email: internalUser.email, password: 'anything' });
     expect(fakeLogin.status).toBe(401);
   });
+
+  it('allows an owner to deactivate, reactivate, and permanently delete a client', async () => {
+    const { agent } = await createAuthenticatedAgent(app);
+    const csrfToken = (await agent.get('/api/v1/csrf-token')).body.csrfToken;
+    const createResponse = await agent
+      .post('/api/v1/workspaces')
+      .set('X-CSRF-Token', csrfToken)
+      .send({ name: 'Cliente para gestão', locale: 'pt', currency: 'BRL' });
+    const client = createResponse.body.data.workspace;
+    const database = getTestDb();
+    const clientRecord = await database('client_workspaces').where('id', client.id).first();
+
+    const accountResponse = await agent
+      .post('/api/v1/accounts')
+      .set('X-CSRF-Token', csrfToken)
+      .send({ name: 'Conta do cliente', type: 'checking', currency: 'BRL' });
+    expect(accountResponse.status).toBe(201);
+
+    const deactivateResponse = await agent
+      .post(`/api/v1/workspaces/${client.id}/deactivate`)
+      .set('X-CSRF-Token', csrfToken);
+    expect(deactivateResponse.status).toBe(200);
+    expect(deactivateResponse.body.data.workspace.isActive).toBe(false);
+    const listedClient = (await agent.get('/api/v1/workspaces')).body.data.workspaces
+      .find((workspace) => workspace.id === client.id);
+    expect(listedClient.isActive).toBe(false);
+    expect((await agent.get('/api/v1/accounts')).body.data).toHaveLength(0);
+
+    const blockedActivation = await agent
+      .post(`/api/v1/workspaces/${client.id}/activate`)
+      .set('X-CSRF-Token', csrfToken);
+    expect(blockedActivation.status).toBe(403);
+
+    const reactivateResponse = await agent
+      .post(`/api/v1/workspaces/${client.id}/reactivate`)
+      .set('X-CSRF-Token', csrfToken);
+    expect(reactivateResponse.status).toBe(200);
+    expect(reactivateResponse.body.data.workspace.isActive).toBe(true);
+
+    await agent
+      .post(`/api/v1/workspaces/${client.id}/activate`)
+      .set('X-CSRF-Token', csrfToken);
+    expect((await agent.get('/api/v1/accounts')).body.data).toHaveLength(1);
+
+    const deleteResponse = await agent
+      .delete(`/api/v1/workspaces/${client.id}`)
+      .set('X-CSRF-Token', csrfToken);
+    expect(deleteResponse.status).toBe(200);
+    expect(await database('client_workspaces').where('id', client.id).first()).toBeUndefined();
+    expect(await database('users').where('id', clientRecord.data_user_id).first()).toBeUndefined();
+    expect(await database('accounts').where('user_id', clientRecord.data_user_id)).toHaveLength(0);
+  });
 });

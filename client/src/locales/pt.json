@@ -877,6 +877,13 @@
       }
     }
   },
+  "workspaces": {
+    "manage": "Gerir clientes",
+    "deactivate": "Desativar",
+    "reactivate": "Reativar",
+    "delete": "Excluir",
+    "confirmDelete": "Excluir permanentemente o cliente \"{{name}}\" e todos os dados financeiros dele? Esta ação não pode ser desfeita."
+  },
   "errors": {
     "INVALID_CREDENTIALS": "Credenciais inválidas",
     "ACCOUNT_SUSPENDED": "Conta suspensa",

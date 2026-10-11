@@ -113,10 +113,34 @@ export function AuthProvider({ children }) {
     return data.data.workspace
   }
 
+  const refreshWorkspaces = async () => {
+    const { data } = await workspaceApi.getAll()
+    const nextWorkspaces = data.data.workspaces || []
+    const nextActiveWorkspace = data.data.activeWorkspace || null
+    setWorkspaces(nextWorkspaces)
+    setActiveWorkspace(nextActiveWorkspace)
+    setWorkspaceRequestContext(nextActiveWorkspace?.id)
+  }
+
+  const deactivateWorkspace = async (workspaceId) => {
+    await workspaceApi.deactivate(workspaceId)
+    await refreshWorkspaces()
+  }
+
+  const reactivateWorkspace = async (workspaceId) => {
+    await workspaceApi.reactivate(workspaceId)
+    await refreshWorkspaces()
+  }
+
+  const deleteWorkspace = async (workspaceId) => {
+    await workspaceApi.delete(workspaceId)
+    await refreshWorkspaces()
+  }
+
   const isGroupAdmin = userGroups.some(g => g.memberRole === 'admin')
 
   return (
-    <AuthContext.Provider value={{ user, userSettings, userGroups, workspaces, activeWorkspace, isGroupAdmin, needsSetup, loading, login, register, logout, checkAuth, updateSettings, switchWorkspace, createWorkspace }}>
+    <AuthContext.Provider value={{ user, userSettings, userGroups, workspaces, activeWorkspace, isGroupAdmin, needsSetup, loading, login, register, logout, checkAuth, updateSettings, switchWorkspace, createWorkspace, deactivateWorkspace, reactivateWorkspace, deleteWorkspace }}>
       {children}
     </AuthContext.Provider>
   )

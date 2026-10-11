@@ -1,8 +1,11 @@
 const environment = typeof import.meta.env === 'object' ? import.meta.env : {}
+const defaultName = 'Assessoria Carvalho'
+const brandName = environment.VITE_APP_NAME || defaultName
+const defaultMark = brandName === defaultName ? 'AC' : brandName.slice(0, 1).toUpperCase()
 
 export const BRAND = {
-  name: environment.VITE_APP_NAME || 'Carvalho',
-  mark: environment.VITE_APP_MARK || (environment.VITE_APP_NAME || 'Carvalho').slice(0, 1).toUpperCase(),
+  name: brandName,
+  mark: environment.VITE_APP_MARK || defaultMark,
   palette: {
     primary: {
       50: '#f3f5f9',

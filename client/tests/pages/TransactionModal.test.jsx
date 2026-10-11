@@ -133,6 +133,14 @@ function getAccountSelect(container) {
   return null
 }
 
+describe('TransactionModal - transaction type defaults', () => {
+  it('starts as income when opened from the income shortcut', () => {
+    render(<TransactionModal {...defaultProps} defaultType="income" />)
+
+    expect(screen.getByText('transactions.types.income').closest('button')).toHaveClass('border-green-500')
+  })
+})
+
 describe('TransactionModal - Card/Check ↔ Account Consistency', () => {
   beforeEach(() => {
     vi.clearAllMocks()

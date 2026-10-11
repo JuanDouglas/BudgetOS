@@ -19,18 +19,50 @@ import { useAuth } from '../contexts/AuthContext'
  */
 export default function Modal({ children, onClose, className = '' }) {
   const overlayRef = useRef(null)
+  const returnFocusRef = useRef(null)
   const { userSettings } = useAuth()
   const persistent = userSettings?.modalPersistent ?? false
 
-  // Handle Escape key to close modal
   useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
+    returnFocusRef.current = document.activeElement
+    const firstFocusable = overlayRef.current?.querySelector(FOCUSABLE_SELECTOR)
+    ;(firstFocusable || overlayRef.current)?.focus()
+
+    return () => {
+      const returnFocus = returnFocusRef.current
+      if (returnFocus instanceof HTMLElement && returnFocus.isConnected) returnFocus.focus()
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
         onClose()
+        return
+      }
+
+      if (event.key !== 'Tab') return
+      const focusable = Array.from(overlayRef.current?.querySelectorAll(FOCUSABLE_SELECTOR) || [])
+        .filter((element) => element.getAttribute('aria-hidden') !== 'true')
+      if (focusable.length === 0) {
+        event.preventDefault()
+        overlayRef.current?.focus()
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && (document.activeElement === first || !overlayRef.current?.contains(document.activeElement))) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && (document.activeElement === last || !overlayRef.current?.contains(document.activeElement))) {
+        event.preventDefault()
+        first.focus()
       }
     }
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
   /**
@@ -48,10 +80,13 @@ export default function Modal({ children, onClose, className = '' }) {
   return (
     <div
       ref={overlayRef}
+      tabIndex={-1}
       onClick={handleOverlayClick}
-      className={`fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 ${className}`}
+      className={`fixed inset-0 overscroll-contain bg-black/50 flex items-center justify-center z-50 p-4 ${className}`}
     >
       {children}
     </div>
   )
 }
+
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'

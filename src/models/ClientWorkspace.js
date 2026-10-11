@@ -20,6 +20,7 @@ const format = (workspace, role, active = false) => ({
   decimalSeparator: workspace.decimal_separator,
   digitGrouping: workspace.digit_grouping,
   isPersonal: Boolean(workspace.is_personal),
+  isActive: Boolean(workspace.is_active),
   role,
   active,
 });
@@ -126,10 +127,34 @@ export default class ClientWorkspace {
     if (!id) return null;
     const workspace = await knex('client_workspaces as w')
       .join('client_workspace_members as m', 'm.workspace_id', 'w.id')
-      .where({ 'w.id': id, 'm.user_id': userId })
+      .where({ 'w.id': id, 'm.user_id': userId, 'w.is_active': true })
       .select('w.*', 'm.role')
       .first();
     return workspace ? format(workspace, workspace.role) : null;
+  }
+
+  static async getOwnedOrFail(id, userId) {
+    const workspace = await knex('client_workspaces as w')
+      .join('client_workspace_members as m', 'm.workspace_id', 'w.id')
+      .where({ 'w.id': id, 'm.user_id': userId, 'm.role': 'owner', 'w.is_personal': false })
+      .select('w.*', 'm.role')
+      .first();
+    if (!workspace) throw new ForbiddenError('Workspace management denied', 'WORKSPACE_FORBIDDEN');
+    return { ...format(workspace, workspace.role), dataUserId: workspace.data_user_id };
+  }
+
+  static async setActive(id, userId, isActive) {
+    await ClientWorkspace.getOwnedOrFail(id, userId);
+    await knex('client_workspaces').where({ id }).update({ is_active: isActive, updated_at: knex.fn.now() });
+    return ClientWorkspace.getOwnedOrFail(id, userId);
+  }
+
+  static async delete(id, userId) {
+    const workspace = await ClientWorkspace.getOwnedOrFail(id, userId);
+    await knex.transaction(async (trx) => {
+      await trx('client_workspaces').where({ id }).del();
+      await trx('users').where({ id: workspace.dataUserId, is_workspace_identity: true }).del();
+    });
   }
 
   static async getAccessibleOrFail(id, userId) {

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { reportsApi } from '../lib/api'
 import { useFormatters } from '../hooks/useFormatters'
@@ -15,7 +16,44 @@ const COLORS = ['#12284d', '#cca761', '#526989', '#dfc58d', '#233c63', '#b1904e'
 
 export default function Reports() {
   const { t } = useTranslation()
-  const [activeTab, setActiveTab] = useState('dre')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedTab = searchParams.get('tab')
+  const activeTab = ['dre', 'accounting', 'payables', 'forecast', 'trend', 'categories'].includes(requestedTab) ? requestedTab : 'dre'
+  const [period, setPeriod] = useState(() => {
+    const defaults = currentMonthPeriod()
+    const requestedPeriod = {
+      startDate: searchParams.get('startDate') || defaults.startDate,
+      endDate: searchParams.get('endDate') || defaults.endDate,
+    }
+    return isValidPeriod(requestedPeriod) ? requestedPeriod : defaults
+  })
+  const periodIsValid = isValidPeriod(period)
+  const quickPeriods = [
+    { id: 'current-month', label: t('reports.periods.currentMonth', { defaultValue: 'Este mês' }), value: currentMonthPeriod() },
+    { id: 'previous-month', label: t('reports.periods.previousMonth', { defaultValue: 'Mês anterior' }), value: previousMonthPeriod() },
+    { id: 'current-quarter', label: t('reports.periods.currentQuarter', { defaultValue: 'Trimestre atual' }), value: currentQuarterPeriod() },
+    { id: 'current-year', label: t('reports.periods.currentYear', { defaultValue: 'Ano atual' }), value: currentYearPeriod() },
+  ]
+
+  const handleTabChange = (tab) => {
+    const nextParams = new URLSearchParams(searchParams)
+    if (tab === 'dre') nextParams.delete('tab')
+    else nextParams.set('tab', tab)
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  const handlePeriodChange = (nextPeriod) => {
+    setPeriod(nextPeriod)
+    const nextParams = new URLSearchParams(searchParams)
+    if (isValidPeriod(nextPeriod)) {
+      nextParams.set('startDate', nextPeriod.startDate)
+      nextParams.set('endDate', nextPeriod.endDate)
+    } else {
+      nextParams.delete('startDate')
+      nextParams.delete('endDate')
+    }
+    setSearchParams(nextParams, { replace: true })
+  }
 
   return (
     <div className="space-y-6">
@@ -23,6 +61,58 @@ export default function Reports() {
         <h1 className="text-2xl font-bold text-gray-900">{t('reports.title')}</h1>
         <p className="text-gray-600">{t('reports.subtitle')}</p>
       </div>
+
+      {!['trend', 'forecast'].includes(activeTab) && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label htmlFor="report-start-date" className="mb-1 block text-sm font-medium text-gray-700">{t('common.from', { defaultValue: 'De' })}</label>
+              <input
+                id="report-start-date"
+                type="date"
+                value={period.startDate}
+                max={period.endDate || undefined}
+                aria-invalid={!periodIsValid}
+                onChange={(event) => handlePeriodChange({ ...period, startDate: event.target.value })}
+                className="input"
+              />
+            </div>
+            <div>
+              <label htmlFor="report-end-date" className="mb-1 block text-sm font-medium text-gray-700">{t('common.to', { defaultValue: 'Até' })}</label>
+              <input
+                id="report-end-date"
+                type="date"
+                value={period.endDate}
+                min={period.startDate || undefined}
+                aria-invalid={!periodIsValid}
+                onChange={(event) => handlePeriodChange({ ...period, endDate: event.target.value })}
+                className="input"
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t('reports.periods.quickSelect', { defaultValue: 'Períodos rápidos' })}>
+            {quickPeriods.map((quickPeriod) => {
+              const isSelected = period.startDate === quickPeriod.value.startDate && period.endDate === quickPeriod.value.endDate
+              return (
+                <button
+                  key={quickPeriod.id}
+                  type="button"
+                  onClick={() => handlePeriodChange(quickPeriod.value)}
+                  aria-pressed={isSelected}
+                  className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${isSelected ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
+                >
+                  {quickPeriod.label}
+                </button>
+              )
+            })}
+          </div>
+          {!periodIsValid && (
+            <p role="status" className="text-sm text-amber-700">
+              {t('reports.periods.invalid', { defaultValue: 'Informe as duas datas e confira se a data inicial não é posterior à data final.' })}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 overflow-x-auto border-b">
@@ -36,7 +126,7 @@ export default function Reports() {
         ].map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabChange(tab.id)}
             className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${
               activeTab === tab.id
                 ? 'border-primary-600 text-primary-600'
@@ -49,20 +139,27 @@ export default function Reports() {
         ))}
       </div>
 
-      {activeTab === 'dre' && <IncomeStatement />}
-      {activeTab === 'accounting' && <AccountingTrialBalance />}
-      {activeTab === 'payables' && <PayablesReceivables />}
       {activeTab === 'trend' && <MonthlyTrend />}
-      {activeTab === 'categories' && <CategoryBreakdown />}
       {activeTab === 'forecast' && <Forecast />}
+      {!['trend', 'forecast'].includes(activeTab) && (periodIsValid ? (
+        <>
+          {activeTab === 'dre' && <IncomeStatement period={period} />}
+          {activeTab === 'accounting' && <AccountingTrialBalance period={period} />}
+          {activeTab === 'payables' && <PayablesReceivables period={period} />}
+          {activeTab === 'categories' && <CategoryBreakdown period={period} />}
+        </>
+      ) : (
+        <div className="card flex min-h-40 items-center justify-center text-center text-sm text-gray-600">
+          {t('reports.periods.invalid', { defaultValue: 'Informe as duas datas e confira se a data inicial não é posterior à data final.' })}
+        </div>
+      ))}
     </div>
   )
 }
 
-function IncomeStatement() {
+function IncomeStatement({ period }) {
   const { t } = useTranslation()
   const { formatCurrency, formatDate } = useFormatters()
-  const period = currentMonthPeriod()
   const { data, isLoading, error } = useQuery({
     queryKey: ['bpo-income-statement', period.startDate, period.endDate],
     queryFn: async () => {
@@ -129,10 +226,9 @@ function IncomeStatement() {
   )
 }
 
-function AccountingTrialBalance() {
+function AccountingTrialBalance({ period }) {
   const { t } = useTranslation()
   const { formatCurrency, formatDate } = useFormatters()
-  const period = currentMonthPeriod()
   const { data, isLoading, error } = useQuery({
     queryKey: ['bpo-accounting-trial-balance', period.startDate, period.endDate],
     queryFn: async () => {
@@ -192,13 +288,10 @@ function AccountingTrialBalance() {
   )
 }
 
-function PayablesReceivables() {
+function PayablesReceivables({ period }) {
   const { t } = useTranslation()
   const { formatCurrency, formatDate } = useFormatters()
-  const startDate = formatLocalDate(new Date())
-  const dueDate = new Date()
-  dueDate.setDate(dueDate.getDate() + 90)
-  const endDate = formatLocalDate(dueDate)
+  const { startDate, endDate } = period
   const { data, isLoading, error } = useQuery({
     queryKey: ['bpo-payables-receivables', startDate, endDate],
     queryFn: () => reportsApi.getForecastTransactions({ startDate, endDate, limit: 500 })
@@ -299,9 +392,47 @@ function ExportButton({ headers, rows, fileName }) {
 
 function currentMonthPeriod() {
   const now = new Date()
-  const startDate = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 1))
-  const endDate = formatLocalDate(new Date(now.getFullYear(), now.getMonth() + 1, 0))
-  return { startDate, endDate }
+  return monthPeriod(now.getFullYear(), now.getMonth())
+}
+
+function previousMonthPeriod() {
+  const now = new Date()
+  return monthPeriod(now.getFullYear(), now.getMonth() - 1)
+}
+
+function currentQuarterPeriod() {
+  const now = new Date()
+  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3
+  return {
+    startDate: formatLocalDate(new Date(now.getFullYear(), quarterStartMonth, 1)),
+    endDate: formatLocalDate(now),
+  }
+}
+
+function currentYearPeriod() {
+  const now = new Date()
+  return {
+    startDate: formatLocalDate(new Date(now.getFullYear(), 0, 1)),
+    endDate: formatLocalDate(now),
+  }
+}
+
+function monthPeriod(year, month) {
+  return {
+    startDate: formatLocalDate(new Date(year, month, 1)),
+    endDate: formatLocalDate(new Date(year, month + 1, 0)),
+  }
+}
+
+function isValidPeriod(period) {
+  return isValidDate(period.startDate) && isValidDate(period.endDate) && period.startDate <= period.endDate
+}
+
+function isValidDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
 }
 
 function MonthlyTrend() {
@@ -340,12 +471,12 @@ function MonthlyTrend() {
   )
 }
 
-function CategoryBreakdown() {
+function CategoryBreakdown({ period }) {
   const { t } = useTranslation()
   const { formatCurrency } = useFormatters()
   const { data, isLoading, error } = useQuery({
-    queryKey: ['expenses-category-report'],
-    queryFn: () => reportsApi.getExpensesByCategory({}).then(r => r.data.data.expenses),
+    queryKey: ['expenses-category-report', period.startDate, period.endDate],
+    queryFn: () => reportsApi.getExpensesByCategory(period).then(r => r.data.data.expenses),
   })
 
   if (isLoading) return <LoadingState />

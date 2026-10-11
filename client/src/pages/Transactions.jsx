@@ -110,7 +110,7 @@ const TransactionTypeIcon = ({ type, amount }) => {
  * @param {Function} props.onCreatePayee - Callback to create a new payee inline
  * @param {Function} props.onCreateCategory - Callback to create a new category inline
  */
-export function TransactionModal({ transaction, accounts, categories, payees, creditCards, defaultAccountId, onClose, onSave, onCreatePayee, onCreateCategory, toast }) {
+export function TransactionModal({ transaction, accounts, categories, payees, creditCards, defaultAccountId, defaultType = 'expense', onClose, onSave, onCreatePayee, onCreateCategory, toast }) {
   const { t, i18n } = useTranslation()
   const { formatCurrency } = useFormatters()
   const [formData, setFormData] = useState(() => {
@@ -125,7 +125,7 @@ export function TransactionModal({ transaction, accounts, categories, payees, cr
       amount: '',
       description: '',
       date: formatLocalDate(new Date()),
-      type: 'expense',
+      type: defaultType,
       checkNumber: '',
       creditCardId: '',
       installmentCount: 1,
@@ -526,12 +526,13 @@ export default function Transactions() {
   const toast = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const [modalOpen, setModalOpen] = useState(false)
+  const [defaultType, setDefaultType] = useState('expense')
   const [editingTx, setEditingTx] = useState(null)
   const [deleteCandidate, setDeleteCandidate] = useState(null)
   /** @type {Set<string>} Set of expanded transaction IDs */
   const [expandedRows, setExpandedRows] = useState(new Set())
   /** @type {boolean} Whether reconciliation mode is active */
-  const [reconcileMode, setReconcileMode] = useState(false)
+  const [reconcileMode, setReconcileMode] = useState(() => searchParams.get('reconcile') === '1')
   /** @type {string} Search input value (immediate) */
   const [searchInput, setSearchInput] = useState('')
   /** @type {string} Deferred search value (debounced) */
@@ -569,17 +570,35 @@ export default function Transactions() {
     queryClient.invalidateQueries({ queryKey: ['credit-card-cycle'] })
   }
 
+  const closeTransactionModal = () => {
+    setModalOpen(false)
+    setEditingTx(null)
+    if (searchParams.has('new')) {
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.delete('new')
+      setSearchParams(nextParams, { replace: true })
+    }
+  }
+
+  const toggleReconcileMode = () => {
+    const nextMode = !reconcileMode
+    const nextParams = new URLSearchParams(searchParams)
+    if (nextMode) nextParams.set('reconcile', '1')
+    else nextParams.delete('reconcile')
+    setSearchParams(nextParams, { replace: true })
+    setReconcileMode(nextMode)
+  }
+
   // Handle account tab change
   const handleAccountTab = useCallback((accountId) => {
     setAccountTab(accountId)
     setFilters(prev => ({ ...prev, accountId }))
     setPersistedAccountTab(accountId)
-    if (accountId) {
-      setSearchParams({ account: accountId }, { replace: true })
-    } else {
-      setSearchParams({}, { replace: true })
-    }
-  }, [setSearchParams])
+    const nextParams = new URLSearchParams(searchParams)
+    if (accountId) nextParams.set('account', accountId)
+    else nextParams.delete('account')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
 
   // Reset all filters and search
   const resetAllFilters = useCallback(() => {
@@ -588,8 +607,10 @@ export default function Transactions() {
     setPersistedAccountTab('')
     setFilters({ accountId: '', categoryId: '', type: '', isReconciled: '', startDate: '', endDate: '' })
     setQuickPeriod('')
-    setSearchParams({}, { replace: true })
-  }, [setSearchParams])
+    const nextParams = new URLSearchParams()
+    if (reconcileMode) nextParams.set('reconcile', '1')
+    setSearchParams(nextParams, { replace: true })
+  }, [reconcileMode, setSearchParams])
 
   // Combine filters with deferred search for API call
   const queryFilters = useMemo(() => ({
@@ -686,6 +707,14 @@ export default function Transactions() {
     queryFn: () => accountsApi.getAll().then(r => r.data),
   })
 
+  useEffect(() => {
+    const requestedType = searchParams.get('new')
+    if (!accountsData?.data || !['income', 'expense'].includes(requestedType)) return
+    setDefaultType(requestedType)
+    setEditingTx(null)
+    setModalOpen(true)
+  }, [accountsData?.data, searchParams])
+
   // Validate persisted account tab exists in loaded accounts
   useEffect(() => {
     if (accountsData?.data && accountTab) {
@@ -756,7 +785,7 @@ export default function Transactions() {
     mutationFn: transactionsApi.create,
     onSuccess: () => {
       invalidateTransactionQueries()
-      setModalOpen(false)
+      closeTransactionModal()
       toast.success(t('transactions.created'))
     },
     onError: (err) => {
@@ -768,8 +797,7 @@ export default function Transactions() {
     mutationFn: ({ id, data }) => transactionsApi.update(id, data),
     onSuccess: () => {
       invalidateTransactionQueries()
-      setModalOpen(false)
-      setEditingTx(null)
+      closeTransactionModal()
       toast.success(t('transactions.updated'))
     },
     onError: (err) => {
@@ -916,7 +944,7 @@ export default function Transactions() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setReconcileMode(!reconcileMode)}
+            onClick={toggleReconcileMode}
             className={`btn flex items-center gap-2 ${
               reconcileMode
                 ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200'
@@ -927,8 +955,8 @@ export default function Transactions() {
             <Scale className="w-5 h-5" />
             {reconcileMode ? t('transactions.reconciliation.exit') : t('transactions.reconciliation.title')}
           </button>
-          {!reconcileMode && (
-            <button onClick={() => setModalOpen(true)} className="btn btn-primary flex items-center gap-2">
+            {!reconcileMode && (
+            <button onClick={() => { setDefaultType('expense'); setEditingTx(null); setModalOpen(true) }} className="btn btn-primary flex items-center gap-2">
               <Plus className="w-5 h-5" />
               {t('transactions.newTransaction')}
             </button>
@@ -947,6 +975,7 @@ export default function Transactions() {
               <input
                 type="text"
                 placeholder={t('common.search')}
+                aria-label={t('common.search')}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="input pl-10 pr-9"
@@ -954,6 +983,7 @@ export default function Transactions() {
               {searchInput && (
                 <button
                   onClick={() => setSearchInput('')}
+                  aria-label={t('transactions.filters.clearSearch')}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
                   title={t('transactions.filters.clearSearch')}
                 >
@@ -966,6 +996,7 @@ export default function Transactions() {
           {!accountTab && (
             <div className="w-48">
               <select
+                aria-label={t('transactions.filters.allAccounts')}
                 value={filters.accountId}
                 onChange={(e) => setFilters({ ...filters, accountId: e.target.value })}
                 className="input"
@@ -979,6 +1010,7 @@ export default function Transactions() {
           )}
           <div className="w-48">
             <select
+              aria-label={t('transactions.filters.allCategories')}
               value={filters.categoryId}
               onChange={(e) => setFilters({ ...filters, categoryId: e.target.value })}
               className="input"
@@ -991,6 +1023,7 @@ export default function Transactions() {
           </div>
           <div className="w-36">
             <select
+              aria-label={t('transactions.filters.allTypes')}
               value={filters.type}
               onChange={(e) => setFilters({ ...filters, type: e.target.value })}
               className="input"
@@ -1003,6 +1036,7 @@ export default function Transactions() {
           </div>
           <div className="w-40">
             <select
+              aria-label={t('transactions.filters.allStatuses')}
               value={filters.isReconciled}
               onChange={(e) => setFilters({ ...filters, isReconciled: e.target.value })}
               className="input"
@@ -1021,7 +1055,9 @@ export default function Transactions() {
             <span className="text-sm text-gray-600">{t('transactions.filters.period')}</span>
           </div>
           <div className="flex items-center gap-2">
+            <label htmlFor="transaction-start-date" className="sr-only">{t('common.from', { defaultValue: 'De' })}</label>
             <input
+              id="transaction-start-date"
               type="date"
               value={filters.startDate}
               onChange={(e) => {
@@ -1032,7 +1068,9 @@ export default function Transactions() {
               placeholder="Du"
             />
             <span className="text-gray-400">→</span>
+            <label htmlFor="transaction-end-date" className="sr-only">{t('common.to', { defaultValue: 'Até' })}</label>
             <input
+              id="transaction-end-date"
               type="date"
               value={filters.endDate}
               onChange={(e) => {
@@ -1295,7 +1333,8 @@ export default function Transactions() {
           payees={payeesData}
           creditCards={creditCardsData?.data?.creditCards || []}
           defaultAccountId={accountTab}
-          onClose={() => { setModalOpen(false); setEditingTx(null); }}
+          defaultType={defaultType}
+          onClose={closeTransactionModal}
           onSave={handleSave}
           onCreatePayee={handleCreatePayee}
           onCreateCategory={handleCreateCategory}

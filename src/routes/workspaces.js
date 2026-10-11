@@ -11,5 +11,8 @@ router.use(requireAuth);
 router.get('/', asyncHandler(workspaceController.listWorkspaces));
 router.post('/', validate({ body: createWorkspaceSchema }), asyncHandler(workspaceController.createWorkspace));
 router.post('/:workspaceId/activate', validate({ params: workspaceIdParamSchema }), asyncHandler(workspaceController.activateWorkspace));
+router.post('/:workspaceId/deactivate', validate({ params: workspaceIdParamSchema }), asyncHandler(workspaceController.deactivateWorkspace));
+router.post('/:workspaceId/reactivate', validate({ params: workspaceIdParamSchema }), asyncHandler(workspaceController.reactivateWorkspace));
+router.delete('/:workspaceId', validate({ params: workspaceIdParamSchema }), asyncHandler(workspaceController.deleteWorkspace));
 
 export default router;

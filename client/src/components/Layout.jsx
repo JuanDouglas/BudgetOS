@@ -5,7 +5,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard, Wallet, ArrowLeftRight, CreditCard,
   Tags, BarChart3, LogOut, Menu, X, Upload, Repeat,
-  Wand2, Settings, Users, Shield, FolderTree, Cog, CalendarRange, Building2, Plus
+  Wand2, Settings, Users, Shield, FolderTree, Cog, CalendarRange, Building2, Plus,
+  Settings2, Archive, RotateCcw, Trash2
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '../lib/utils'
@@ -33,12 +34,13 @@ const adminNavigation = [
 ]
 
 export default function Layout() {
-  const { user, isGroupAdmin, logout, workspaces, activeWorkspace, switchWorkspace, createWorkspace } = useAuth()
+  const { user, isGroupAdmin, logout, workspaces, activeWorkspace, switchWorkspace, createWorkspace, deactivateWorkspace, reactivateWorkspace, deleteWorkspace } = useAuth()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showNewClient, setShowNewClient] = useState(false)
+  const [showManageClients, setShowManageClients] = useState(false)
   const [newClient, setNewClient] = useState({ name: '', locale: 'pt', currency: 'BRL' })
   const [workspaceError, setWorkspaceError] = useState('')
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false)
@@ -78,8 +80,45 @@ export default function Layout() {
     }
   }
 
+  const handleDeactivateWorkspace = async (workspace) => {
+    setWorkspaceError('')
+    try {
+      await deactivateWorkspace(workspace.id)
+      if (activeWorkspace?.id === workspace.id) queryClient.clear()
+    } catch (error) {
+      setWorkspaceError(error.response?.data?.error?.message || t('common.error'))
+    }
+  }
+
+  const handleReactivateWorkspace = async (workspace) => {
+    setWorkspaceError('')
+    try {
+      await reactivateWorkspace(workspace.id)
+    } catch (error) {
+      setWorkspaceError(error.response?.data?.error?.message || t('common.error'))
+    }
+  }
+
+  const handleDeleteWorkspace = async (workspace) => {
+    const confirmation = t('workspaces.confirmDelete', {
+      name: workspace.name,
+      defaultValue: `Excluir permanentemente o cliente "${workspace.name}" e todos os dados financeiros dele? Esta ação não pode ser desfeita.`,
+    })
+    if (!window.confirm(confirmation)) return
+    setWorkspaceError('')
+    try {
+      await deleteWorkspace(workspace.id)
+      if (activeWorkspace?.id === workspace.id) queryClient.clear()
+    } catch (error) {
+      setWorkspaceError(error.response?.data?.error?.message || t('common.error'))
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-primary-700 focus:shadow-md">
+        {t('nav.skipToContent', { defaultValue: 'Pular para o conteúdo' })}
+      </a>
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div 
@@ -90,15 +129,15 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 w-64 bg-primary-600 text-white border-r border-primary-700 transform transition-transform lg:translate-x-0",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-            <h1 className="text-xl font-bold text-primary-600">{BRAND.name}</h1>
+          <div className="flex items-center justify-between h-20 px-5 border-b border-white/15">
+            <img src="/logos/assessoria-carvalho.svg" alt={BRAND.name} className="h-12 w-48 object-contain object-left" />
             <button 
-              className="lg:hidden p-1 rounded hover:bg-gray-100"
+              className="lg:hidden p-1 rounded hover:bg-white/10"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="w-5 h-5" />
@@ -106,7 +145,7 @@ export default function Layout() {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <nav id="primary-navigation" aria-label={t('nav.main', { defaultValue: 'Navegação principal' })} className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => (
               <NavLink
                 key={item.href}
@@ -115,8 +154,8 @@ export default function Layout() {
                 className={({ isActive }) => cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-primary-50 text-primary-700"
-                    : "text-gray-700 hover:bg-gray-100"
+                    ? "bg-white/15 text-white"
+                    : "text-white/80 hover:bg-white/10 hover:text-white"
                 )}
                 onClick={() => setSidebarOpen(false)}
               >
@@ -128,8 +167,8 @@ export default function Layout() {
             {/* Admin section - super_admin and group admins */}
             {(user?.role === 'super_admin' || isGroupAdmin) && (
               <>
-                <div className="border-t border-gray-200 my-3" />
-                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1 flex items-center gap-2">
+                <div className="border-t border-white/15 my-3" />
+                <p className="px-3 text-xs font-semibold text-white/50 uppercase tracking-wider mb-1 flex items-center gap-2">
                   <Shield className="w-3.5 h-3.5" />
                   {t('nav.administration')}
                 </p>
@@ -146,8 +185,8 @@ export default function Layout() {
                     className={({ isActive }) => cn(
                       "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                       isActive
-                        ? "bg-primary-50 text-primary-700"
-                        : "text-gray-700 hover:bg-gray-100"
+                        ? "bg-white/15 text-white"
+                        : "text-white/80 hover:bg-white/10 hover:text-white"
                     )}
                     onClick={() => setSidebarOpen(false)}
                   >
@@ -160,22 +199,22 @@ export default function Layout() {
           </nav>
 
           {/* Version */}
-          <div className="mx-4 mb-2 px-3 py-1.5 bg-gray-50 rounded-lg text-center">
-            <span className="text-xs text-gray-400 font-medium tracking-wide">{BRAND.name} v{__APP_VERSION__}</span>
+          <div className="mx-4 mb-2 px-3 py-1.5 rounded-lg text-center">
+            <span className="text-xs text-white/50 font-medium tracking-wide">{BRAND.name} v{__APP_VERSION__}</span>
           </div>
 
           {/* User */}
-          <div className="p-4 border-t border-gray-200">
+          <div className="p-4 border-t border-white/15">
             <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-sm font-medium text-white truncate">
                   {user?.fullName || user?.email}
                 </p>
-                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                <p className="text-xs text-white/60 truncate">{user?.email}</p>
               </div>
               <button
                 onClick={handleLogout}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                className="p-2 text-white/60 hover:text-white rounded-lg hover:bg-white/10"
                 title={t('nav.logout')}
               >
                 <LogOut className="w-5 h-5" />
@@ -207,7 +246,7 @@ export default function Layout() {
                 className="input h-10 max-w-[min(52vw,240px)] py-1 text-sm"
                 aria-label={t('workspaces.current', { defaultValue: 'Cliente atual' })}
               >
-                {workspaces.map((workspace) => (
+                {workspaces.filter((workspace) => workspace.isActive).map((workspace) => (
                   <option key={workspace.id} value={workspace.id}>
                     {workspace.isPersonal ? t('workspaces.personal', { defaultValue: 'Meu espaço' }) : workspace.name}
                   </option>
@@ -222,13 +261,24 @@ export default function Layout() {
               >
                 <Plus className="h-4 w-4" />
               </button>
+              {workspaces.some((workspace) => !workspace.isPersonal) && (
+                <button
+                  type="button"
+                  onClick={() => { setWorkspaceError(''); setShowManageClients(true) }}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50"
+                  title={t('workspaces.manage', { defaultValue: 'Gerir clientes' })}
+                  aria-label={t('workspaces.manage', { defaultValue: 'Gerir clientes' })}
+                >
+                  <Settings2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-6">
-          {workspaceError && !showNewClient && <p role="alert" className="mb-4 text-sm text-red-600">{workspaceError}</p>}
+        <main id="main-content" tabIndex={-1} className="p-4 lg:p-6 focus:outline-none">
+          {workspaceError && !showNewClient && !showManageClients && <p role="alert" className="mb-4 text-sm text-red-600">{workspaceError}</p>}
           <Outlet />
         </main>
       </div>
@@ -279,6 +329,50 @@ export default function Layout() {
                 </button>
               </div>
             </form>
+          </section>
+        </div>
+      )}
+
+      {showManageClients && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setShowManageClients(false)
+        }}>
+          <section className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="manage-clients-title">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="manage-clients-title" className="text-lg font-semibold">{t('workspaces.manage', { defaultValue: 'Gerir clientes' })}</h2>
+              <button type="button" onClick={() => setShowManageClients(false)} className="rounded p-1 text-gray-500 hover:bg-gray-100" aria-label={t('common.close', { defaultValue: 'Fechar' })}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {workspaceError && <p role="alert" className="mb-3 text-sm text-red-600">{workspaceError}</p>}
+            <div className="max-h-[60vh] divide-y overflow-y-auto">
+              {workspaces.filter((workspace) => !workspace.isPersonal).map((workspace) => (
+                <div key={workspace.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-900">{workspace.name}</p>
+                    <p className={`mt-0.5 text-xs ${workspace.isActive ? 'text-green-700' : 'text-gray-500'}`}>
+                      {workspace.isActive ? t('common.active') : t('common.inactive')}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {workspace.role === 'owner' && (workspace.isActive ? (
+                      <button type="button" onClick={() => handleDeactivateWorkspace(workspace)} className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                        <Archive className="h-4 w-4" />{t('workspaces.deactivate', { defaultValue: 'Desativar' })}
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => handleReactivateWorkspace(workspace)} className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                        <RotateCcw className="h-4 w-4" />{t('workspaces.reactivate', { defaultValue: 'Reativar' })}
+                      </button>
+                    ))}
+                    {workspace.role === 'owner' && (
+                      <button type="button" onClick={() => handleDeleteWorkspace(workspace)} className="inline-flex items-center gap-1.5 rounded-md border border-red-200 px-2.5 py-1.5 text-sm text-red-700 hover:bg-red-50">
+                        <Trash2 className="h-4 w-4" />{t('workspaces.delete', { defaultValue: 'Excluir' })}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
         </div>
       )}
