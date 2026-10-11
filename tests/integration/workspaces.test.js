@@ -157,4 +157,30 @@ describe('Client workspaces', () => {
     expect(await database('users').where('id', clientRecord.data_user_id).first()).toBeUndefined();
     expect(await database('accounts').where('user_id', clientRecord.data_user_id)).toHaveLength(0);
   });
+
+  it('stores client notes and restricts editing to workspace owners', async () => {
+    const owner = await createAuthenticatedAgent(app, { email: 'notes-owner@example.com' });
+    const ownerCsrf = (await owner.agent.get('/api/v1/csrf-token')).body.csrfToken;
+    const created = await owner.agent
+      .post('/api/v1/workspaces')
+      .set('X-CSRF-Token', ownerCsrf)
+      .send({ name: 'Cliente com notas', locale: 'pt', currency: 'BRL', notes: 'Contrato mensal; fechamento dia 5.' });
+    const clientId = created.body.data.workspace.id;
+    expect(created.body.data.workspace.notes).toBe('Contrato mensal; fechamento dia 5.');
+
+    const updated = await owner.agent
+      .put(`/api/v1/workspaces/${clientId}/notes`)
+      .set('X-CSRF-Token', ownerCsrf)
+      .send({ notes: 'Enviar documentos fiscais até dia 3.' });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.workspace.notes).toBe('Enviar documentos fiscais até dia 3.');
+
+    const other = await createAuthenticatedAgent(app, { email: 'notes-other@example.com' });
+    const otherCsrf = (await other.agent.get('/api/v1/csrf-token')).body.csrfToken;
+    const forbidden = await other.agent
+      .put(`/api/v1/workspaces/${clientId}/notes`)
+      .set('X-CSRF-Token', otherCsrf)
+      .send({ notes: 'Alteração não autorizada' });
+    expect(forbidden.status).toBe(403);
+  });
 });

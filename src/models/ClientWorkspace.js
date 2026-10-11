@@ -21,6 +21,7 @@ const format = (workspace, role, active = false) => ({
   digitGrouping: workspace.digit_grouping,
   isPersonal: Boolean(workspace.is_personal),
   isActive: Boolean(workspace.is_active),
+  notes: workspace.notes || '',
   role,
   active,
 });
@@ -104,6 +105,7 @@ export default class ClientWorkspace {
         locale,
         decimal_separator: decimalSeparator,
         digit_grouping: digitGrouping,
+        notes: data.notes?.trim() || null,
       });
       await trx('client_workspace_members').insert({
         id: generateId(), workspace_id: workspaceId, user_id: userId, role: 'owner',
@@ -146,6 +148,15 @@ export default class ClientWorkspace {
   static async setActive(id, userId, isActive) {
     await ClientWorkspace.getOwnedOrFail(id, userId);
     await knex('client_workspaces').where({ id }).update({ is_active: isActive, updated_at: knex.fn.now() });
+    return ClientWorkspace.getOwnedOrFail(id, userId);
+  }
+
+  static async updateNotes(id, userId, notes) {
+    await ClientWorkspace.getOwnedOrFail(id, userId);
+    await knex('client_workspaces').where({ id }).update({
+      notes: notes?.trim() || null,
+      updated_at: knex.fn.now(),
+    });
     return ClientWorkspace.getOwnedOrFail(id, userId);
   }
 

@@ -5,6 +5,7 @@ const locales = ['de', 'en', 'es', 'fr', 'it', 'pt', 'ru', 'sv', 'zh'];
 
 export const createWorkspaceSchema = z.object({
   name: z.string().trim().min(1).max(120),
+  notes: z.string().max(5000).optional(),
   currency: z.enum(currencies).optional(),
   locale: z.enum(locales).optional(),
   decimalSeparator: z.enum([',', '.']).optional(),
@@ -12,6 +13,10 @@ export const createWorkspaceSchema = z.object({
 }).refine((data) => !data.digitGrouping || data.digitGrouping !== data.decimalSeparator, {
   message: 'Decimal separator and digit grouping cannot be the same',
   path: ['digitGrouping'],
+});
+
+export const updateWorkspaceNotesSchema = z.object({
+  notes: z.string().max(5000),
 });
 
 export const workspaceIdParamSchema = z.object({

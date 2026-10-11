@@ -132,6 +132,12 @@ export function AuthProvider({ children }) {
     await refreshWorkspaces()
   }
 
+  const updateWorkspaceNotes = async (workspaceId, notes) => {
+    const { data } = await workspaceApi.updateNotes(workspaceId, { notes })
+    await refreshWorkspaces()
+    return data.data.workspace
+  }
+
   const deleteWorkspace = async (workspaceId) => {
     await workspaceApi.delete(workspaceId)
     await refreshWorkspaces()
@@ -140,7 +146,7 @@ export function AuthProvider({ children }) {
   const isGroupAdmin = userGroups.some(g => g.memberRole === 'admin')
 
   return (
-    <AuthContext.Provider value={{ user, userSettings, userGroups, workspaces, activeWorkspace, isGroupAdmin, needsSetup, loading, login, register, logout, checkAuth, updateSettings, switchWorkspace, createWorkspace, deactivateWorkspace, reactivateWorkspace, deleteWorkspace }}>
+    <AuthContext.Provider value={{ user, userSettings, userGroups, workspaces, activeWorkspace, isGroupAdmin, needsSetup, loading, login, register, logout, checkAuth, updateSettings, switchWorkspace, createWorkspace, deactivateWorkspace, reactivateWorkspace, updateWorkspaceNotes, deleteWorkspace }}>
       {children}
     </AuthContext.Provider>
   )

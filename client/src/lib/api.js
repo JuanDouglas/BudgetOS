@@ -123,6 +123,7 @@ export const workspaceApi = {
   activate: (workspaceId) => api.post(`/workspaces/${workspaceId}/activate`),
   deactivate: (workspaceId) => api.post(`/workspaces/${workspaceId}/deactivate`),
   reactivate: (workspaceId) => api.post(`/workspaces/${workspaceId}/reactivate`),
+  updateNotes: (workspaceId, notes) => api.put(`/workspaces/${workspaceId}/notes`, notes),
   delete: (workspaceId) => api.delete(`/workspaces/${workspaceId}`),
 }
 

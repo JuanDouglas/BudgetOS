@@ -539,43 +539,129 @@ function CategoryBreakdown({ period }) {
 
 function Forecast() {
   const { t } = useTranslation()
-  const { formatCurrency, locale } = useFormatters()
+  const { formatCurrency, formatDate, locale } = useFormatters()
+  const [horizon, setHorizon] = useState(90)
+  const startDate = formatLocalDate(new Date())
+  const horizonDate = new Date()
+  horizonDate.setDate(horizonDate.getDate() + horizon)
+  const endDate = formatLocalDate(horizonDate)
   const { data, isLoading, error } = useQuery({
-    queryKey: ['forecast'],
-    queryFn: () => reportsApi.getForecast({ days: 90 }).then(r => r.data.data.forecast),
+    queryKey: ['cashflow-summary', horizon],
+    queryFn: () => reportsApi.getForecast({ days: horizon }).then(r => r.data.data.forecast),
+  })
+  const { data: transactions = [], isLoading: transactionsLoading, error: transactionsError } = useQuery({
+    queryKey: ['cashflow-transactions', startDate, endDate],
+    queryFn: () => reportsApi.getForecastTransactions({ startDate, endDate })
+      .then((response) => response.data.data.data || []),
   })
 
-  if (isLoading) return <LoadingState />
-  if (error) return <ErrorState error={error} />
+  if (isLoading || transactionsLoading) return <LoadingState />
+  if (error || transactionsError) return <ErrorState error={error || transactionsError} />
 
-  const chartData = data?.dailyBalances?.filter((_, i) => i % 7 === 0) || []
+  const dailyBalances = data?.dailyBalances || []
+  const activityByDate = new Map()
+
+  for (const transaction of transactions) {
+    const activity = activityByDate.get(transaction.date) || {
+      actualIncome: 0,
+      actualExpenses: 0,
+      projectedIncome: 0,
+      projectedExpenses: 0,
+      transfers: 0,
+      transactions: [],
+    }
+    const amount = Math.abs(Number(transaction.amount) || 0)
+    const prefix = transaction.source === 'projected' ? 'projected' : 'actual'
+    if (transaction.type === 'income') activity[`${prefix}Income`] += amount
+    else if (transaction.type === 'expense') activity[`${prefix}Expenses`] += amount
+    else if (transaction.type === 'transfer') activity.transfers += amount
+    activity.transactions.push(transaction)
+    activityByDate.set(transaction.date, activity)
+  }
+
+  const lastBalanceDate = dailyBalances.at(-1)?.date
+  const dailyRows = dailyBalances
+    .map((balance) => ({
+      date: balance.date,
+      balance: Number(balance.balance) || 0,
+      ...(activityByDate.get(balance.date) || {
+        actualIncome: 0,
+        actualExpenses: 0,
+        projectedIncome: 0,
+        projectedExpenses: 0,
+        transfers: 0,
+        transactions: [],
+      }),
+    }))
+    .filter((day) => day.transactions.length > 0 || day.date === lastBalanceDate)
+
+  const actualIncome = transactions
+    .filter((item) => item.source !== 'projected' && item.type === 'income')
+    .reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0)
+  const actualExpenses = transactions
+    .filter((item) => item.source !== 'projected' && item.type === 'expense')
+    .reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0)
+  const projectedIncome = transactions
+    .filter((item) => item.source === 'projected' && item.type === 'income')
+    .reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0)
+  const projectedExpenses = transactions
+    .filter((item) => item.source === 'projected' && item.type === 'expense')
+    .reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0)
+  const lowestBalance = dailyBalances.reduce((lowest, balance) =>
+    Number(balance.balance) < Number(lowest.balance) ? balance : lowest,
+  dailyBalances[0] || { balance: data?.currentBalance || 0, date: startDate })
+  const endingBalance = dailyBalances.at(-1)?.balance ?? data?.currentBalance ?? 0
+  const chartStep = Math.max(1, Math.ceil(dailyBalances.length / 12))
+  const chartData = dailyBalances.filter((_, index) => index % chartStep === 0 || index === dailyBalances.length - 1)
   const intlLocale = locale === 'pt' ? 'pt-BR' : locale
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card">
-          <p className="text-sm text-gray-600">{t('reports.forecast.currentBalance')}</p>
-          <p className="text-2xl font-bold">{formatCurrency(data?.currentBalance || 0)}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm text-gray-600">{formatDate(startDate)} – {formatDate(endDate)}</p>
+          <p className="text-xs text-gray-500">{t('reports.forecast.cashflowBasis', { defaultValue: 'Realizado e recorrências previstas; transferências internas não alteram o saldo consolidado.' })}</p>
         </div>
-        <div className="card">
-          <p className="text-sm text-gray-600">{t('reports.forecast.in30days')}</p>
-          <p className="text-2xl font-bold">{formatCurrency(data?.forecast?.days30 || 0)}</p>
+        <div className="inline-flex rounded-md border border-gray-300 bg-white p-1" role="group" aria-label={t('reports.forecast.horizon', { defaultValue: 'Horizonte da projeção' })}>
+          {[30, 60, 90].map((days) => (
+            <button
+              key={days}
+              type="button"
+              onClick={() => setHorizon(days)}
+              aria-pressed={horizon === days}
+              className={`rounded px-3 py-1.5 text-sm font-medium ${horizon === days ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              {t('reports.forecast.horizonDays', { days, defaultValue: `${days} dias` })}
+            </button>
+          ))}
         </div>
-        <div className="card">
-          <p className="text-sm text-gray-600">{t('reports.forecast.in60days')}</p>
-          <p className="text-2xl font-bold">{formatCurrency(data?.forecast?.days60 || 0)}</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-gray-600">{t('reports.forecast.in90days')}</p>
-          <p className="text-2xl font-bold">{formatCurrency(data?.forecast?.days90 || 0)}</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <SummaryValue label={t('reports.forecast.currentBalance')} value={Number(data?.currentBalance) || 0} formatCurrency={formatCurrency} />
+        <SummaryValue label={t('reports.forecast.actualIncome', { defaultValue: 'Receitas realizadas' })} value={actualIncome} formatCurrency={formatCurrency} />
+        <SummaryValue label={t('reports.forecast.actualExpenses', { defaultValue: 'Despesas realizadas' })} value={actualExpenses} formatCurrency={formatCurrency} />
+        <SummaryValue label={t('reports.forecast.projectedIncome', { defaultValue: 'Entradas previstas' })} value={projectedIncome} formatCurrency={formatCurrency} />
+        <SummaryValue label={t('reports.forecast.projectedExpenses', { defaultValue: 'Saídas previstas' })} value={projectedExpenses} formatCurrency={formatCurrency} />
+        <SummaryValue label={t('reports.forecast.projectedBalance', { defaultValue: 'Saldo ao final do período' })} value={Number(endingBalance)} formatCurrency={formatCurrency} />
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm text-amber-800">{t('reports.forecast.lowestBalance', { defaultValue: 'Menor saldo projetado' })}</p>
+          <p className="text-lg font-semibold text-amber-900">{formatCurrency(Number(lowestBalance.balance) || 0)}</p>
+          <p className="text-xs text-amber-800">{formatDate(lowestBalance.date)}</p>
         </div>
       </div>
 
       <div className="card">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold">{t('reports.forecast.title')}</h3>
-          <ExportButton headers={['Data', 'Saldo']} rows={(data?.dailyBalances || []).map((row) => [row.date, row.balance])} fileName="fluxo-de-caixa.csv" />
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold">{t('reports.forecast.title')}</h3>
+            <p className="text-sm text-gray-500">{t('reports.forecast.dailySchedule', { defaultValue: 'Movimentação diária e saldo consolidado' })}</p>
+          </div>
+          <ExportButton
+            headers={['Data', 'Receitas realizadas', 'Despesas realizadas', 'Entradas previstas', 'Saídas previstas', 'Saldo projetado']}
+            rows={dailyRows.map((row) => [row.date, row.actualIncome, row.actualExpenses, row.projectedIncome, row.projectedExpenses, row.balance])}
+            fileName="fluxo-de-caixa-detalhado.csv"
+          />
         </div>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
@@ -601,6 +687,57 @@ function Forecast() {
             </LineChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      <div className="card overflow-x-auto">
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold">{t('reports.forecast.dailySchedule', { defaultValue: 'Movimentação diária e saldo consolidado' })}</h3>
+          <p className="text-sm text-gray-500">{t('reports.forecast.detailHint', { defaultValue: 'Expanda um dia para consultar cada lançamento e sua origem.' })}</p>
+        </div>
+        <table className="w-full min-w-[780px] text-sm">
+          <thead className="border-b text-left text-gray-500">
+            <tr>
+              <th className="py-2 font-medium">{t('common.date')}</th>
+              <th className="py-2 font-medium">{t('reports.forecast.details', { defaultValue: 'Detalhes' })}</th>
+              <th className="py-2 text-right font-medium">{t('reports.forecast.actualIncome', { defaultValue: 'Realizado +' })}</th>
+              <th className="py-2 text-right font-medium">{t('reports.forecast.projectedIncome', { defaultValue: 'Previsto +' })}</th>
+              <th className="py-2 text-right font-medium">{t('reports.forecast.projectedExpenses', { defaultValue: 'Previsto -' })}</th>
+              <th className="py-2 text-right font-medium">{t('reports.forecast.projectedBalance', { defaultValue: 'Saldo projetado' })}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {dailyRows.map((row) => (
+              <tr key={row.date}>
+                <td className="whitespace-nowrap py-3 font-medium">{formatDate(row.date)}</td>
+                <td className="py-3">
+                  {row.transactions.length > 0 ? (
+                    <details className="max-w-md">
+                      <summary className="cursor-pointer text-primary-700 hover:text-primary-800">
+                        {t('reports.forecast.transactionCount', { count: row.transactions.length, defaultValue: `${row.transactions.length} lançamentos` })}
+                      </summary>
+                      <ul className="mt-2 space-y-2 border-l-2 border-gray-200 pl-3">
+                        {row.transactions.map((transaction) => (
+                          <li key={transaction.id} className="break-words">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="font-medium text-gray-800">{transaction.description}</span>
+                              <span className="text-xs text-gray-500">{transaction.source === 'projected' ? t('forecast.projected') : t('reports.forecast.realized', { defaultValue: 'Realizado' })}</span>
+                            </div>
+                            <p className="text-xs text-gray-500">{transaction.accountName || ''}{transaction.categoryName ? ` · ${transaction.categoryName}` : ''}{transaction.payeeName ? ` · ${transaction.payeeName}` : ''}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  ) : <span className="text-gray-400">{t('reports.forecast.noMovement', { defaultValue: 'Sem movimentação' })}</span>}
+                </td>
+                <td className="whitespace-nowrap py-3 text-right tabular-nums">{formatCurrency(row.actualIncome)}</td>
+                <td className="whitespace-nowrap py-3 text-right tabular-nums text-green-700">{formatCurrency(row.projectedIncome)}</td>
+                <td className="whitespace-nowrap py-3 text-right tabular-nums text-red-700">{formatCurrency(row.projectedExpenses)}</td>
+                <td className="whitespace-nowrap py-3 text-right font-semibold tabular-nums">{formatCurrency(row.balance)}</td>
+              </tr>
+            ))}
+            {dailyRows.length === 0 && <EmptyRow colSpan={6} label={t('common.noData')} />}
+          </tbody>
+        </table>
       </div>
     </div>
   )

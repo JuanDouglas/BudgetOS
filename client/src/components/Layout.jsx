@@ -6,11 +6,12 @@ import {
   LayoutDashboard, Wallet, ArrowLeftRight, CreditCard,
   Tags, BarChart3, LogOut, Menu, X, Upload, Repeat,
   Wand2, Settings, Users, Shield, FolderTree, Cog, CalendarRange, Building2, Plus,
-  Settings2, Archive, RotateCcw, Trash2
+  Settings2, Archive, RotateCcw, Trash2, Save
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '../lib/utils'
 import { BRAND } from '../lib/brand'
+import Modal from './Modal'
 
 const navigation = [
   { name: 'nav.dashboard', href: '/', icon: LayoutDashboard },
@@ -34,14 +35,16 @@ const adminNavigation = [
 ]
 
 export default function Layout() {
-  const { user, isGroupAdmin, logout, workspaces, activeWorkspace, switchWorkspace, createWorkspace, deactivateWorkspace, reactivateWorkspace, deleteWorkspace } = useAuth()
+  const { user, isGroupAdmin, logout, workspaces, activeWorkspace, switchWorkspace, createWorkspace, deactivateWorkspace, reactivateWorkspace, updateWorkspaceNotes, deleteWorkspace } = useAuth()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showNewClient, setShowNewClient] = useState(false)
   const [showManageClients, setShowManageClients] = useState(false)
-  const [newClient, setNewClient] = useState({ name: '', locale: 'pt', currency: 'BRL' })
+  const [newClient, setNewClient] = useState({ name: '', notes: '', locale: 'pt', currency: 'BRL' })
+  const [clientNoteDrafts, setClientNoteDrafts] = useState({})
+  const [savingNotesWorkspace, setSavingNotesWorkspace] = useState(null)
   const [workspaceError, setWorkspaceError] = useState('')
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false)
   const [creatingWorkspace, setCreatingWorkspace] = useState(false)
@@ -72,11 +75,24 @@ export default function Layout() {
       await createWorkspace(newClient)
       queryClient.clear()
       setShowNewClient(false)
-      setNewClient({ name: '', locale: 'pt', currency: 'BRL' })
+      setNewClient({ name: '', notes: '', locale: 'pt', currency: 'BRL' })
     } catch (error) {
       setWorkspaceError(error.response?.data?.error?.message || t('common.error'))
     } finally {
       setCreatingWorkspace(false)
+    }
+  }
+
+  const handleSaveWorkspaceNotes = async (workspace) => {
+    const notes = clientNoteDrafts[workspace.id] ?? workspace.notes ?? ''
+    setSavingNotesWorkspace(workspace.id)
+    setWorkspaceError('')
+    try {
+      await updateWorkspaceNotes(workspace.id, notes)
+    } catch (error) {
+      setWorkspaceError(error.response?.data?.error?.message || t('common.error'))
+    } finally {
+      setSavingNotesWorkspace(null)
     }
   }
 
@@ -284,9 +300,7 @@ export default function Layout() {
       </div>
 
       {showNewClient && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setShowNewClient(false)
-        }}>
+        <Modal onClose={() => setShowNewClient(false)}>
           <section className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="new-client-title">
             <div className="mb-5 flex items-center justify-between">
               <h2 id="new-client-title" className="text-lg font-semibold">{t('workspaces.newTitle', { defaultValue: 'Novo cliente' })}</h2>
@@ -298,6 +312,10 @@ export default function Layout() {
               <div>
                 <label htmlFor="client-name" className="mb-1 block text-sm font-medium text-gray-700">{t('workspaces.name', { defaultValue: 'Nome do cliente' })}</label>
                 <input id="client-name" autoFocus required maxLength={120} value={newClient.name} onChange={(event) => setNewClient({ ...newClient, name: event.target.value })} className="input" />
+              </div>
+              <div>
+                <label htmlFor="new-client-notes" className="mb-1 block text-sm font-medium text-gray-700">{t('workspaces.notes', { defaultValue: 'Notas do cliente' })}</label>
+                <textarea id="new-client-notes" rows={3} maxLength={5000} value={newClient.notes} onChange={(event) => setNewClient({ ...newClient, notes: event.target.value })} className="input resize-y" placeholder={t('workspaces.notesPlaceholder', { defaultValue: 'Prazos, contatos e orientações de atendimento' })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -330,13 +348,11 @@ export default function Layout() {
               </div>
             </form>
           </section>
-        </div>
+        </Modal>
       )}
 
       {showManageClients && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setShowManageClients(false)
-        }}>
+        <Modal onClose={() => setShowManageClients(false)}>
           <section className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="manage-clients-title">
             <div className="mb-4 flex items-center justify-between">
               <h2 id="manage-clients-title" className="text-lg font-semibold">{t('workspaces.manage', { defaultValue: 'Gerir clientes' })}</h2>
@@ -346,35 +362,65 @@ export default function Layout() {
             </div>
             {workspaceError && <p role="alert" className="mb-3 text-sm text-red-600">{workspaceError}</p>}
             <div className="max-h-[60vh] divide-y overflow-y-auto">
-              {workspaces.filter((workspace) => !workspace.isPersonal).map((workspace) => (
-                <div key={workspace.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-gray-900">{workspace.name}</p>
-                    <p className={`mt-0.5 text-xs ${workspace.isActive ? 'text-green-700' : 'text-gray-500'}`}>
-                      {workspace.isActive ? t('common.active') : t('common.inactive')}
-                    </p>
+              {workspaces.filter((workspace) => !workspace.isPersonal).map((workspace) => {
+                const notes = clientNoteDrafts[workspace.id] ?? workspace.notes ?? ''
+                const notesChanged = notes !== (workspace.notes ?? '')
+                return (
+                  <div key={workspace.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-900">{workspace.name}</p>
+                      <p className={`mt-0.5 text-xs ${workspace.isActive ? 'text-green-700' : 'text-gray-500'}`}>
+                        {workspace.isActive ? t('common.active') : t('common.inactive')}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {workspace.role === 'owner' && (workspace.isActive ? (
+                        <button type="button" onClick={() => handleDeactivateWorkspace(workspace)} className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                          <Archive className="h-4 w-4" />{t('workspaces.deactivate', { defaultValue: 'Desativar' })}
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => handleReactivateWorkspace(workspace)} className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                          <RotateCcw className="h-4 w-4" />{t('workspaces.reactivate', { defaultValue: 'Reativar' })}
+                        </button>
+                      ))}
+                      {workspace.role === 'owner' && (
+                        <button type="button" onClick={() => handleDeleteWorkspace(workspace)} className="inline-flex items-center gap-1.5 rounded-md border border-red-200 px-2.5 py-1.5 text-sm text-red-700 hover:bg-red-50">
+                          <Trash2 className="h-4 w-4" />{t('workspaces.delete', { defaultValue: 'Excluir' })}
+                        </button>
+                      )}
+                    </div>
+                    <div className="w-full basis-full">
+                      <label htmlFor={`client-notes-${workspace.id}`} className="mb-1 block text-sm font-medium text-gray-700">{t('workspaces.notes', { defaultValue: 'Notas do cliente' })}</label>
+                      <div className="flex items-end gap-2">
+                        <textarea
+                          id={`client-notes-${workspace.id}`}
+                          rows={2}
+                          maxLength={5000}
+                          readOnly={workspace.role !== 'owner'}
+                          value={notes}
+                          onChange={(event) => setClientNoteDrafts((current) => ({ ...current, [workspace.id]: event.target.value }))}
+                          className="input min-h-16 resize-y"
+                          placeholder={t('workspaces.notesPlaceholder', { defaultValue: 'Prazos, contatos e orientações de atendimento' })}
+                        />
+                        {workspace.role === 'owner' && (
+                          <button
+                            type="button"
+                            onClick={() => handleSaveWorkspaceNotes(workspace)}
+                            disabled={!notesChanged || savingNotesWorkspace === workspace.id}
+                            className="btn btn-primary inline-flex shrink-0 items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Save className="h-4 w-4" />
+                            {savingNotesWorkspace === workspace.id ? t('common.saving') : t('common.save')}
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {workspace.role === 'owner' && (workspace.isActive ? (
-                      <button type="button" onClick={() => handleDeactivateWorkspace(workspace)} className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
-                        <Archive className="h-4 w-4" />{t('workspaces.deactivate', { defaultValue: 'Desativar' })}
-                      </button>
-                    ) : (
-                      <button type="button" onClick={() => handleReactivateWorkspace(workspace)} className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
-                        <RotateCcw className="h-4 w-4" />{t('workspaces.reactivate', { defaultValue: 'Reativar' })}
-                      </button>
-                    ))}
-                    {workspace.role === 'owner' && (
-                      <button type="button" onClick={() => handleDeleteWorkspace(workspace)} className="inline-flex items-center gap-1.5 rounded-md border border-red-200 px-2.5 py-1.5 text-sm text-red-700 hover:bg-red-50">
-                        <Trash2 className="h-4 w-4" />{t('workspaces.delete', { defaultValue: 'Excluir' })}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </section>
-        </div>
+        </Modal>
       )}
     </div>
   )

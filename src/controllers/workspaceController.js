@@ -38,6 +38,15 @@ export const reactivateWorkspace = async (req, res) => {
   res.json({ success: true, data: { workspace } });
 };
 
+export const updateWorkspaceNotes = async (req, res) => {
+  const workspace = await ClientWorkspace.updateNotes(
+    req.params.workspaceId,
+    req.user.id,
+    req.body.notes
+  );
+  res.json({ success: true, data: { workspace } });
+};
+
 export const deleteWorkspace = async (req, res) => {
   const { workspaceId } = req.params;
   await ClientWorkspace.getOwnedOrFail(workspaceId, req.user.id);

@@ -3,12 +3,23 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Reports from '../../src/pages/Reports'
+import { formatLocalDate } from '../../src/lib/utils'
 
 vi.mock('../../src/lib/api', () => ({
   reportsApi: {
     getIncomeByCategory: vi.fn().mockResolvedValue({ data: { data: { income: [] } } }),
     getExpensesByCategory: vi.fn().mockResolvedValue({ data: { data: { expenses: [] } } }),
     getForecastTransactions: vi.fn().mockResolvedValue({ data: { data: { data: [] } } }),
+    getForecast: vi.fn().mockResolvedValue({
+      data: {
+        data: {
+          forecast: {
+            currentBalance: 1000,
+            dailyBalances: [],
+          },
+        },
+      },
+    }),
   },
 }))
 
@@ -43,10 +54,24 @@ function renderReports(initialEntry = '/') {
 
 describe('Reports period filter', () => {
   beforeEach(() => {
+    const today = formatLocalDate(new Date())
+    globalThis.ResizeObserver = class {
+      constructor(callback) {
+        this.callback = callback
+      }
+      observe() {
+        this.callback([{ contentRect: { width: 800, height: 400 } }])
+      }
+      unobserve() {}
+      disconnect() {}
+    }
     vi.clearAllMocks()
     reportsApi.getIncomeByCategory.mockResolvedValue({ data: { data: { income: [] } } })
     reportsApi.getExpensesByCategory.mockResolvedValue({ data: { data: { expenses: [] } } })
     reportsApi.getForecastTransactions.mockResolvedValue({ data: { data: { data: [] } } })
+    reportsApi.getForecast.mockResolvedValue({
+      data: { data: { forecast: { currentBalance: 1000, dailyBalances: [{ date: today, balance: 1000 }] } } },
+    })
   })
 
   it('shows guidance instead of breaking when the end date is temporarily empty', async () => {
@@ -87,5 +112,27 @@ describe('Reports period filter', () => {
 
     expect(screen.getByLabelText('common.from')).toHaveValue('2026-07-01')
     expect(screen.getByLabelText('common.to')).toHaveValue('2026-07-31')
+  })
+
+  it('shows realized and projected activity in the detailed cashflow', async () => {
+    const today = formatLocalDate(new Date())
+    reportsApi.getForecastTransactions.mockResolvedValue({
+      data: {
+        data: {
+          data: [
+            { id: 'actual-income', date: today, type: 'income', amount: 500, source: 'actual', description: 'Recebimento cliente', accountName: 'Conta corrente', categoryName: 'Serviços' },
+            { id: 'projected-expense', date: today, type: 'expense', amount: -200, source: 'projected', description: 'Aluguel do escritório', accountName: 'Conta corrente', categoryName: 'Ocupação' },
+          ],
+        },
+      },
+    })
+    renderReports()
+    fireEvent.click(screen.getByRole('button', { name: 'reports.forecast.bpo.cashflow' }))
+
+    fireEvent.click(await screen.findByText('reports.forecast.transactionCount'))
+    expect(await screen.findByText('Recebimento cliente')).toBeInTheDocument()
+    expect(screen.getByText('Aluguel do escritório')).toBeInTheDocument()
+    expect(screen.getAllByText('reports.forecast.actualIncome')).toHaveLength(2)
+    expect(reportsApi.getForecast).toHaveBeenCalledWith({ days: 90 })
   })
 })
